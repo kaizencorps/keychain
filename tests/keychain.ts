@@ -27,6 +27,7 @@ describe("keychain", () => {
     );
 
     console.log(`keychain pda: ${keychainPda.toBase58()}`);
+    console.log(`keychain program ID: ${program.programId.toBase58()}`);
 
     // the 2nd key to put on the keychain
     const key2 = anchor.web3.Keypair.generate();
@@ -69,7 +70,7 @@ describe("keychain", () => {
   });
 
   it("Adds a key to the keychain and verifies it", async () => {
-      await program.rpc.addUserKey(key2.publicKey, {
+      await program.rpc.addPlayerKey(key2.publicKey, {
           accounts: {
               keychain: keychainPda,
               user: provider.wallet.publicKey,
@@ -82,7 +83,7 @@ describe("keychain", () => {
       assert.ok(!keychain.keys[1].verified, 'added key should be verified');
 
       // try to add again and we fail (already there)
-      program.rpc.addUserKey(key2.publicKey, {
+      program.rpc.addPlayerKey(key2.publicKey, {
           accounts: {
               keychain: keychainPda,
               user: provider.wallet.publicKey,
@@ -93,7 +94,7 @@ describe("keychain", () => {
           // expected
       });
 
-      await wallet2Program.rpc.confirmUserKey({
+      await wallet2Program.rpc.confirmPlayerKey({
           accounts: {
               keychain: keychainPda,
               user: key2.publicKey,
@@ -110,7 +111,7 @@ describe("keychain", () => {
 
   it("removes a key from the keychain", async () => {
       // we'll remove the original key (simulate it potentially being a custodial key)
-      await wallet2Program.rpc.removeUserKey(provider.wallet.publicKey, {
+      await wallet2Program.rpc.removePlayerKey(provider.wallet.publicKey, {
           accounts: {
               keychain: keychainPda,
               user: key2.publicKey,
@@ -124,7 +125,7 @@ describe("keychain", () => {
 
   it("closes an empty keychain account", async () => {
      // now wallet2 will remove itself (key2) from the keychain (the only key)
-     await wallet2Program.rpc.removeUserKey(key2.publicKey, {
+     await wallet2Program.rpc.removePlayerKey(key2.publicKey, {
          accounts: {
             keychain: keychainPda,
             user: key2.publicKey,

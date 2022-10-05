@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
-
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
 
 #[program]
 pub mod keychain {
@@ -10,7 +9,7 @@ pub mod keychain {
 
     pub fn create_keychain(ctx: Context<CreateKeychain>, username: String, appname: String) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
-        let key = UserKey {
+        let key = PlayerKey {
             key: *ctx.accounts.user.to_account_info().key,
             verified: true
         };
@@ -24,7 +23,7 @@ pub mod keychain {
     }
 
     // user w/existing keychain (and verified key), adds a new (unverified) key
-    pub fn add_user_key(ctx: Context<AddUserKey>, key: Pubkey) -> Result <()> {
+    pub fn add_player_key(ctx: Context<AddPlayerKey>, key: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -47,7 +46,7 @@ pub mod keychain {
         // todo: check keychain size limit ..?
 
         // Build the struct.
-        let key = UserKey {
+        let key = PlayerKey {
             key: key,
             verified: false,
         };
@@ -60,7 +59,7 @@ pub mod keychain {
     }
 
     // user confirms a new (unverified) key on a keychain (which then becomes verified)
-    pub fn confirm_user_key(ctx: Context<ConfirmUserKey>) -> Result <()> {
+    pub fn confirm_player_key(ctx: Context<ConfirmPlayerKey>) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -85,7 +84,7 @@ pub mod keychain {
     }
 
     // remove a key from the keychain
-    pub fn remove_user_key(ctx: Context<RemoveUserKey>, key: Pubkey) -> Result <()> {
+    pub fn remove_player_key(ctx: Context<RemovePlayerKey>, key: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -119,37 +118,18 @@ pub mod keychain {
 
         Ok(())
     }
-
-    // The function now accepts a gif_link param from the user. We also reference the user from the Context
-    /*
-    pub fn add_gif(ctx: Context<AddGif>, gif_link: String) -> Result <()> {
-        let base_account = &mut ctx.accounts.base_account;
-        let user = &mut ctx.accounts.user;
-
-        // Build the struct.
-        let item = ItemStruct {
-            gif_link: gif_link.to_string(),
-            user_address: *user.to_account_info().key,
-        };
-
-        // Add it to the gif_list vector.
-        base_account.gif_list.push(item);
-        base_account.total_gifs += 1;
-        Ok(())
-    }
-
-     */
 }
 
 #[derive(Accounts)]
 #[instruction(username: String, appname: String)]
 pub struct CreateKeychain<'info> {
+    // space: 8 discriminator + 4 (vec) + size(PlayerKey) = 40
     #[account(
         init,
         payer = user,
         seeds = [username.as_bytes().as_ref(), appname.as_bytes().as_ref(), "keychain".as_bytes().as_ref()],
         bump,
-        space = 8 + 2 + 3 * 32
+        space = 8 + KeyChain::MAX_SIZE
     )]
     pub keychain: Account<'info, KeyChain>,
     #[account(mut)]
@@ -159,21 +139,27 @@ pub struct CreateKeychain<'info> {
 
 // Create a custom struct for us to work with.
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct UserKey {
+pub struct PlayerKey {
+    // size = 8 + 32
     pub key: Pubkey,
-    pub verified: bool
+    pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
 }
 
 #[account]
 pub struct KeyChain {
     pub num_keys: u16,
     // Attach a Vector of type ItemStruct to the account.
-    pub keys: Vec<UserKey>,
+    pub keys: Vec<PlayerKey>,
+}
+
+impl KeyChain {
+    // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
+    pub const MAX_SIZE: usize = 2 + (4 + 40 * 3);
 }
 
 // Add the signer who calls the AddGif method to the struct so that we can save it
 #[derive(Accounts)]
-pub struct AddUserKey<'info> {
+pub struct AddPlayerKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
 
@@ -184,7 +170,7 @@ pub struct AddUserKey<'info> {
 
 // Confirm the signer who calls the AddGif method to the struct so that we can save it
 #[derive(Accounts)]
-pub struct ConfirmUserKey<'info> {
+pub struct ConfirmPlayerKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
 
@@ -194,7 +180,7 @@ pub struct ConfirmUserKey<'info> {
 }
 
 #[derive(Accounts)]
-pub struct RemoveUserKey<'info> {
+pub struct RemovePlayerKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
 
