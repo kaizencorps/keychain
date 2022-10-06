@@ -2,6 +2,7 @@ import * as anchor from "@project-serum/anchor";
 import {AnchorProvider, Program, Wallet} from "@project-serum/anchor";
 import { Keychain } from "../target/types/keychain";
 import * as assert from "assert";
+import {sendAndConfirmTransaction} from "@solana/web3.js";
 const { SystemProgram } = anchor.web3;
 
 
@@ -14,12 +15,12 @@ describe("keychain", () => {
   // const program = anchor.workspace.Keychain;
 
     const appName = 'domination';
-    const username = 'silostack';
+    const playername = 'silostack';
 
     // our keychain account
     const [keychainPda, keychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
-            Buffer.from(anchor.utils.bytes.utf8.encode(username)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(playername)),
             Buffer.from(anchor.utils.bytes.utf8.encode(appName)),
             Buffer.from(anchor.utils.bytes.utf8.encode("keychain")),
         ],
@@ -49,7 +50,21 @@ describe("keychain", () => {
     });
 
     it("Creates the keychain", async () => {
-      let tx = await program.rpc.createKeychain(username, appName, {
+
+      // check doesn't exist yet
+      let keychain = null;
+      try {
+          await program.account.keyChain.fetch(keychainPda);
+          assert.fail("keychain shouldn't exist");
+      } catch (err) {
+          // expected
+      }
+
+      // another way to check if it exists
+      let accountInfo = await provider.connection.getAccountInfo(keychainPda);
+      assert.ok(accountInfo == null);
+
+      let txid = await program.rpc.createKeychain(playername, appName, {
               accounts: {
                   keychain: keychainPda,
                   user: provider.wallet.publicKey,
@@ -57,16 +72,59 @@ describe("keychain", () => {
               }
           }
       );
+      console.log(`created 1st keychain tx: ${txid}`);
 
-      console.log(`created keychain tx: ${tx}`);
+      // create another
+      const player2 = 'player2';
+      const [player2KeychainPda, keychainPdaBump2] = anchor.web3.PublicKey.findProgramAddressSync(
+        [
+            Buffer.from(anchor.utils.bytes.utf8.encode(player2)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(appName)),
+            Buffer.from(anchor.utils.bytes.utf8.encode("keychain")),
+        ],
+        program.programId
+      );
+
+      // another way in case we need to create a transaction
+      const tx = await program.methods.createKeychain('player2', appName).accounts({
+        keychain: player2KeychainPda,
+        // user: provider.wallet.publicKey,
+        user: provider.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      }).transaction();
+
+      tx.feePayer = provider.wallet.publicKey;
+      tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
+      // const signedTx = await provider.wallet.signTransaction(tx);
+      // txid = await provider.connection.sendRawTransaction(signedTx.serialize());
+      txid = await provider.sendAndConfirm(tx);
+
+      console.log(`created 2nd keychain tx: ${txid}`);
 
       // now let's fetch that fuckin thing
-      let keychain = await program.account.keyChain.fetch(keychainPda);
+      keychain = await program.account.keyChain.fetch(keychainPda);
       console.log('keychain: ', keychain);
       console.log('-- num keys: ', keychain.numKeys);
       console.log('-- keys: ', keychain.keys);
       console.log('-- key 1: ', keychain.keys[0].key.toBase58());
 
+      accountInfo = await provider.connection.getAccountInfo(keychainPda);
+      assert.ok(accountInfo != null);
+      console.log("accountinfo: ", accountInfo);
+
+      // try to create another from same playername/app
+      try {
+          await program.rpc.createKeychain(playername, appName, {
+              accounts: {
+                  keychain: keychainPda,
+                  user: provider.wallet.publicKey,
+                  systemProgram: SystemProgram.programId,
+              }
+          });
+          assert.fail("shouldn't be able to create same keychain again");
+      } catch (err) {
+          // expected
+      }
   });
 
   it("Adds a key to the keychain and verifies it", async () => {

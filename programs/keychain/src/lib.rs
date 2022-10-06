@@ -145,6 +145,7 @@ pub struct PlayerKey {
     pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
 }
 
+// todo: might wanna store the "display" version since the account should be derived from a "normalized" version of the playername
 #[account]
 pub struct KeyChain {
     pub num_keys: u16,
