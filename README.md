@@ -1,9 +1,9 @@
 # Overview
 
-Keychain is being built as a way to associate multiple wallets to a single on-chain account. The very basic
-problem that it's being built for is to allow [Domination](https://domination.gg) players to sign in with one wallet
-(such as one on a mobile device) while using NFTs housed in a different wallet (such as on a hardware wallet). However, 
-we plan for Keychain to be used for several use cases such as:
+Created at the Solana Hacker House in Bogota, Keychain is a way to associate multiple wallets to a single on-chain account. 
+The very basic problem that it's being built for is to allow [Domination](https://domination.gg) 
+players to sign in with one wallet (such as one on a mobile device) while using NFTs housed in a different wallet (such as on a hardware wallet). 
+However, we plan for Keychain to be used for several other use cases such as:
 
 - player profiles
 - basis for a wallet-agnostic reputation system
