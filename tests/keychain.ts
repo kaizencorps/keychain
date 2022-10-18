@@ -2,9 +2,13 @@ import * as anchor from "@project-serum/anchor";
 import {AnchorProvider, Program, Wallet} from "@project-serum/anchor";
 import { Keychain } from "../target/types/keychain";
 import * as assert from "assert";
-import {sendAndConfirmTransaction} from "@solana/web3.js";
+import {Keypair, sendAndConfirmTransaction} from "@solana/web3.js";
 const { SystemProgram } = anchor.web3;
 
+
+const domain = 'domination';
+const playername = 'silostack';
+const KEYCHAIN = 'keychain';
 
 describe("keychain", () => {
   // Configure the client to use the local cluster.
@@ -14,32 +18,53 @@ describe("keychain", () => {
   const program = anchor.workspace.Keychain as Program<Keychain>;
   // const program = anchor.workspace.Keychain;
 
-    const appName = 'domination';
-    const playername = 'silostack';
 
-    // our keychain account
-    const [keychainPda, keychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
+    // the keychain created by the admin (on behalf of the player)
+    const adminPlayername = 'admin-player';
+
+    // our domain account
+    const [domainPda, domainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
-            Buffer.from(anchor.utils.bytes.utf8.encode(playername)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(appName)),
-            Buffer.from(anchor.utils.bytes.utf8.encode("keychain")),
+            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
         ],
         program.programId
     );
 
-    console.log(`keychain pda: ${keychainPda.toBase58()}`);
+    // our keychain accounts
+    const [playerKeychainPda, playerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
+        [
+            Buffer.from(anchor.utils.bytes.utf8.encode(playername)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
+        ],
+        program.programId
+    );
+
+    const [adminPlayerKeychainPda, adminPlayerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
+        [
+            Buffer.from(anchor.utils.bytes.utf8.encode(adminPlayername)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
+        ],
+        program.programId
+    );
+
+    console.log(`domain pda: ${domainPda.toBase58()}`);
+    console.log(`player keychain pda: ${playerKeychainPda.toBase58()}`);
+    console.log(`admin player keychain pda: ${adminPlayerKeychainPda.toBase58()}`);
     console.log(`keychain program ID: ${program.programId.toBase58()}`);
 
     // the 2nd key to put on the keychain
     const key2 = anchor.web3.Keypair.generate();
 
     // wallet 2 provider (simulate separate connection)
-    const wallet2Provider = new AnchorProvider(
+    const provider2 = new AnchorProvider(
         provider.connection,
         new Wallet(key2),
         {}
     );
-    const wallet2Program = new Program(program.idl, program.programId, wallet2Provider);
+    const program2 = new Program(program.idl, program.programId, provider2);
 
     it('sets up the test', async () => {
         // airdrop some sol to the 2nd key's wallet
@@ -49,47 +74,83 @@ describe("keychain", () => {
         );
     });
 
-    it("Creates the keychain", async () => {
+    it("Creates the domain and keychain", async () => {
+
+      try {
+        await program.account.domain.fetch(domainPda);
+        assert.fail("domain account shouldn't exist");
+      } catch (err) {
+        // expected
+      }
 
       // check doesn't exist yet
       let keychain = null;
       try {
-          await program.account.keyChain.fetch(keychainPda);
+          await program.account.keyChain.fetch(playerKeychainPda);
           assert.fail("keychain shouldn't exist");
       } catch (err) {
           // expected
       }
 
       // another way to check if it exists
-      let accountInfo = await provider.connection.getAccountInfo(keychainPda);
+      let accountInfo = await provider.connection.getAccountInfo(playerKeychainPda);
       assert.ok(accountInfo == null);
 
-      let txid = await program.rpc.createKeychain(playername, appName, {
-              accounts: {
-                  keychain: keychainPda,
-                  user: provider.wallet.publicKey,
-                  systemProgram: SystemProgram.programId,
-              }
+      let txid = await program.rpc.createDomain(domain, {
+          accounts: {
+              domain: domainPda,
+              authority: provider.wallet.publicKey,
+              systemProgram: SystemProgram.programId
           }
-      );
+      });
+      console.log(`created domain tx: ${txid}`);
+
+      let domainAcct = await program.account.domain.fetch(domainPda);
+        let domainName  = new TextDecoder("utf-8").decode(new Uint8Array(domainAcct.name));
+        // console.log('domain: ', domainAcct);
+        console.log('domain: ', domainPda.toBase58());
+        console.log('-- name: ', domainName);
+        console.log('-- authority: ', domainAcct.authority.toBase58());
+        console.log('-- bump: ', domainAcct.bump);
+
+      const adminPlayerWallet = new Keypair();
+
+      // create keychain (admin since the domain's authority = signer/authority)
+        txid = await program.methods.createKeychain(playername).accounts({
+            keychain: playerKeychainPda,
+            domain: domainPda,
+            authority: provider.wallet.publicKey,
+            wallet: provider.wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+        }).rpc();
+
       console.log(`created 1st keychain tx: ${txid}`);
+      keychain = await program.account.keyChain.fetch(playerKeychainPda);
+      console.log('keychain: ', keychain);
+      console.log('-- domain: ', keychain.domain.toBase58());
+      console.log('-- num keys: ', keychain.numKeys);
+      console.log('-- keys: ', keychain.keys);
+      console.log('-- key 1: ', keychain.keys[0].key.toBase58());
 
       // create another
       const player2 = 'player2';
       const [player2KeychainPda, keychainPdaBump2] = anchor.web3.PublicKey.findProgramAddressSync(
         [
             Buffer.from(anchor.utils.bytes.utf8.encode(player2)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(appName)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
             Buffer.from(anchor.utils.bytes.utf8.encode("keychain")),
         ],
         program.programId
       );
 
+      const player2Wallet = new Keypair();
       // another way in case we need to create a transaction
-      const tx = await program.methods.createKeychain('player2', appName).accounts({
+      const tx = await program.methods.createKeychain('player2').accounts({
         keychain: player2KeychainPda,
+          domain: domainPda,
         // user: provider.wallet.publicKey,
-        user: provider.wallet.publicKey,
+        authority: provider.wallet.publicKey,
+          wallet: player2Wallet.publicKey,
         systemProgram: SystemProgram.programId,
       }).transaction();
 
@@ -102,22 +163,25 @@ describe("keychain", () => {
       console.log(`created 2nd keychain tx: ${txid}`);
 
       // now let's fetch that fuckin thing
-      keychain = await program.account.keyChain.fetch(keychainPda);
+      keychain = await program.account.keyChain.fetch(player2KeychainPda);
       console.log('keychain: ', keychain);
-      console.log('-- num keys: ', keychain.numKeys);
+        console.log('-- domain: ', keychain.domain.toBase58());
+        console.log('-- num keys: ', keychain.numKeys);
       console.log('-- keys: ', keychain.keys);
       console.log('-- key 1: ', keychain.keys[0].key.toBase58());
 
-      accountInfo = await provider.connection.getAccountInfo(keychainPda);
+      accountInfo = await provider.connection.getAccountInfo(playerKeychainPda);
       assert.ok(accountInfo != null);
       console.log("accountinfo: ", accountInfo);
 
       // try to create another from same playername/app
       try {
-          await program.rpc.createKeychain(playername, appName, {
+          await program.rpc.createKeychain(playername, {
               accounts: {
-                  keychain: keychainPda,
-                  user: provider.wallet.publicKey,
+                  keychain: playerKeychainPda,
+                  domain: domainPda,
+                  authority: provider.wallet.publicKey,
+                  wallet: provider.wallet.publicKey,
                   systemProgram: SystemProgram.programId,
               }
           });
@@ -130,12 +194,12 @@ describe("keychain", () => {
   it("Adds a key to the keychain and verifies it", async () => {
       await program.rpc.addPlayerKey(key2.publicKey, {
           accounts: {
-              keychain: keychainPda,
+              keychain: playerKeychainPda,
               user: provider.wallet.publicKey,
           }
       });
 
-      let keychain = await program.account.keyChain.fetch(keychainPda);
+      let keychain = await program.account.keyChain.fetch(playerKeychainPda);
 
       // not verified yet
       assert.ok(!keychain.keys[1].verified, 'added key should be verified');
@@ -143,7 +207,7 @@ describe("keychain", () => {
       // try to add again and we fail (already there)
       program.rpc.addPlayerKey(key2.publicKey, {
           accounts: {
-              keychain: keychainPda,
+              keychain: playerKeychainPda,
               user: provider.wallet.publicKey,
           }
       }).then(() => {
@@ -152,15 +216,15 @@ describe("keychain", () => {
           // expected
       });
 
-      await wallet2Program.rpc.confirmPlayerKey({
+      await program2.rpc.confirmPlayerKey({
           accounts: {
-              keychain: keychainPda,
+              keychain: playerKeychainPda,
               user: key2.publicKey,
           }
       });
 
       // now the 2nd key is verified
-      keychain = await program.account.keyChain.fetch(keychainPda);
+      keychain = await program.account.keyChain.fetch(playerKeychainPda);
 
       // verified!
       assert.ok(keychain.keys[1].verified, 'added key should be verified');
@@ -169,29 +233,29 @@ describe("keychain", () => {
 
   it("removes a key from the keychain", async () => {
       // we'll remove the original key (simulate it potentially being a custodial key)
-      await wallet2Program.rpc.removePlayerKey(provider.wallet.publicKey, {
+      await program2.rpc.removePlayerKey(provider.wallet.publicKey, {
           accounts: {
-              keychain: keychainPda,
+              keychain: playerKeychainPda,
               user: key2.publicKey,
           }
       });
 
-      let keychain = await program.account.keyChain.fetch(keychainPda);
+      let keychain = await program.account.keyChain.fetch(playerKeychainPda);
       assert.ok(keychain.numKeys == 1, 'should only be 1 key on the keychain');
       assert.ok(keychain.keys.length == 1, 'should only be 1 key on the keychain');
   });
 
   it("closes an empty keychain account", async () => {
      // now wallet2 will remove itself (key2) from the keychain (the only key)
-     await wallet2Program.rpc.removePlayerKey(key2.publicKey, {
+     await program2.rpc.removePlayerKey(key2.publicKey, {
          accounts: {
-            keychain: keychainPda,
+            keychain: playerKeychainPda,
             user: key2.publicKey,
          }
       });
 
       // account shouldn't exist now
-      program.account.keyChain.fetch(keychainPda).then(() => {
+      program.account.keyChain.fetch(playerKeychainPda).then(() => {
           assert.fail("account shouldn't exist");
       }).catch(() => {
           // expected

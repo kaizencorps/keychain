@@ -2,17 +2,45 @@ use anchor_lang::prelude::*;
 
 declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
 
+const KEYCHAIN: &str = "keychain";
+
 #[program]
 pub mod keychain {
     use anchor_lang::AccountsClose;
     use super::*;
 
-    pub fn create_keychain(ctx: Context<CreateKeychain>, username: String, appname: String) -> Result <()> {
+    pub fn create_domain(ctx: Context<CreateDomain>, name: String) -> Result <()> {
+        ctx.accounts.domain.authority = *ctx.accounts.authority.key;
+        ctx.accounts.domain.bump = *ctx.bumps.get("domain").unwrap();
+        // let domain_name = name.as_bytes();
+        // let mut name = [0u8; 32];
+        // name[..domain_name.len()].copy_from_slice(domain_name);
+
+        // todo: check name length <= 32
+
+        ctx.accounts.domain.name = name;
+        msg!("created domain account: {}", ctx.accounts.domain.key());
+        Ok(())
+    }
+
+    // if done by admin, then the authority needs to be the Domain's authority
+    pub fn create_keychain(ctx: Context<CreateKeychain>, playername: String) -> Result <()> {
+        let mut admin = false;
+
+        // if the signer is the same as the domain authority, then this is a domain admin
+        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
+            admin = true;
+        } else {
+            // otherwise, the wallet being added needs to be the signer
+            require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, ErrorCode::NotSigner);
+        }
+
         let keychain = &mut ctx.accounts.keychain;
         let key = PlayerKey {
-            key: *ctx.accounts.user.to_account_info().key,
+            key: *ctx.accounts.wallet.to_account_info().key,
             verified: true
         };
+        // keychain.domain = ctx.accounts.domain.key();
         // add to the keychain vector
         keychain.keys.push(key);
         keychain.num_keys = 1;
@@ -120,45 +148,83 @@ pub mod keychain {
     }
 }
 
+// create a domain account for admin usage
+
 #[derive(Accounts)]
-#[instruction(username: String, appname: String)]
-pub struct CreateKeychain<'info> {
-    // space: 8 discriminator + 4 (vec) + size(PlayerKey) = 40
+#[instruction(name: String)]
+pub struct CreateDomain<'info> {
+    // space: 8 discriminator + size(Domain) = 40
     #[account(
         init,
-        payer = user,
-        seeds = [username.as_bytes().as_ref(), appname.as_bytes().as_ref(), "keychain".as_bytes().as_ref()],
+        payer = authority,
+        seeds = [name.as_bytes().as_ref(), "keychain".as_bytes().as_ref()],
+        bump,
+        space = 8 + Domain::MAX_SIZE,
+    )]
+    domain: Account<'info, Domain>,
+    #[account(mut)]
+    authority: Signer<'info>,
+    system_program: Program <'info, System>,
+}
+
+
+#[derive(Accounts)]
+#[instruction(playername: String)]
+pub struct CreateKeychain<'info> {
+    // space: 8 discriminator + KeyChain::MAX_SIZE
+    #[account(
+        init,
+        payer = authority,
+        seeds = [playername.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         space = 8 + KeyChain::MAX_SIZE
     )]
-    pub keychain: Account<'info, KeyChain>,
+    keychain: Account<'info, KeyChain>,
+    #[account()]
+    domain: Account<'info, Domain>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    wallet: AccountInfo<'info>,
     #[account(mut)]
-    pub user: Signer<'info>,
-    pub system_program: Program <'info, System>,
+    authority: Signer<'info>,
+    system_program: Program <'info, System>,
 }
 
 // Create a custom struct for us to work with.
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct PlayerKey {
-    // size = 8 + 32
+    // size = 1 + 32 = 33
     pub key: Pubkey,
     pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
 }
 
-// todo: might wanna store the "display" version since the account should be derived from a "normalized" version of the playername
+// todo: might wanna store the "display" version of the playername since the account should be derived from a "normalized" version of the playername
 #[account]
 pub struct KeyChain {
-    pub num_keys: u16,
+    num_keys: u16,
+    domain: Pubkey,
     // Attach a Vector of type ItemStruct to the account.
-    pub keys: Vec<PlayerKey>,
+    keys: Vec<PlayerKey>,
 }
 
 impl KeyChain {
     // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
-    pub const MAX_SIZE: usize = 2 + (4 + 40 * 3);
+    pub const MAX_SIZE: usize = 2 + 32 + (4 + 3 * 33);
 }
 
-// Add the signer who calls the AddGif method to the struct so that we can save it
+// domains are needed for admin functions
+#[account]
+pub struct Domain {
+    // max size = 32
+    name: String,
+    authority: Pubkey,
+    bump: u8
+}
+
+impl Domain {
+    // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
+    pub const MAX_SIZE: usize = 32 + 32 + 1;
+}
+
 #[derive(Accounts)]
 pub struct AddPlayerKey<'info> {
     #[account(mut)]
@@ -200,6 +266,10 @@ pub enum ErrorCode {
     SignerNotInKeychain,
     #[msg("That key doesn't exist on this keychain")]
     KeyNotFound,
+    #[msg("Signer is not a domain admin")]
+    NotDomainAdmin,
+    #[msg("Can only add wallet of signer")]
+    NotSigner,
 
 }
 
