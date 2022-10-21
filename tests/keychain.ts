@@ -106,10 +106,11 @@ describe("keychain", () => {
       console.log(`created domain tx: ${txid}`);
 
       let domainAcct = await program.account.domain.fetch(domainPda);
+        // if stored as byte array
         let domainName  = new TextDecoder("utf-8").decode(new Uint8Array(domainAcct.name));
         // console.log('domain: ', domainAcct);
         console.log('domain: ', domainPda.toBase58());
-        console.log('-- name: ', domainName);
+        console.log('-- name: ', domainAcct.name);
         console.log('-- authority: ', domainAcct.authority.toBase58());
         console.log('-- bump: ', domainAcct.bump);
 
