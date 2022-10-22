@@ -51,7 +51,7 @@ pub mod keychain {
     }
 
     // user w/existing keychain (and verified key), adds a new (unverified) key
-    pub fn add_player_key(ctx: Context<AddPlayerKey>, key: Pubkey) -> Result <()> {
+    pub fn add_key(ctx: Context<AddKey>, key: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -86,8 +86,8 @@ pub mod keychain {
         Ok(())
     }
 
-    // user confirms a new (unverified) key on a keychain (which then becomes verified)
-    pub fn confirm_player_key(ctx: Context<ConfirmPlayerKey>) -> Result <()> {
+    // user verifies a new (unverified) key on a keychain (which then becomes verified)
+    pub fn verify_key(ctx: Context<VerifyKey>) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -111,8 +111,8 @@ pub mod keychain {
         Ok(())
     }
 
-    // remove a key from the keychain
-    pub fn remove_player_key(ctx: Context<RemovePlayerKey>, key: Pubkey) -> Result <()> {
+    // remove a key from a keychain
+    pub fn remove_key(ctx: Context<RemoveKey>, key: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -226,7 +226,7 @@ impl Domain {
 }
 
 #[derive(Accounts)]
-pub struct AddPlayerKey<'info> {
+pub struct AddKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
 
@@ -237,7 +237,7 @@ pub struct AddPlayerKey<'info> {
 
 // Confirm the signer who calls the AddGif method to the struct so that we can save it
 #[derive(Accounts)]
-pub struct ConfirmPlayerKey<'info> {
+pub struct VerifyKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
 
@@ -247,7 +247,7 @@ pub struct ConfirmPlayerKey<'info> {
 }
 
 #[derive(Accounts)]
-pub struct RemovePlayerKey<'info> {
+pub struct RemoveKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
 
@@ -255,7 +255,6 @@ pub struct RemovePlayerKey<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 }
-
 
 
 #[error_code]

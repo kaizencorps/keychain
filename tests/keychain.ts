@@ -5,7 +5,6 @@ import * as assert from "assert";
 import {Keypair, sendAndConfirmTransaction} from "@solana/web3.js";
 const { SystemProgram } = anchor.web3;
 
-
 const domain = 'domination';
 const playername = 'silostack';
 const KEYCHAIN = 'keychain';
@@ -193,7 +192,7 @@ describe("keychain", () => {
   });
 
   it("Adds a key to the keychain and verifies it", async () => {
-      await program.rpc.addPlayerKey(key2.publicKey, {
+      await program.rpc.addKey(key2.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
               user: provider.wallet.publicKey,
@@ -206,7 +205,7 @@ describe("keychain", () => {
       assert.ok(!keychain.keys[1].verified, 'added key should be verified');
 
       // try to add again and we fail (already there)
-      program.rpc.addPlayerKey(key2.publicKey, {
+      program.rpc.addKey(key2.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
               user: provider.wallet.publicKey,
@@ -217,7 +216,7 @@ describe("keychain", () => {
           // expected
       });
 
-      await program2.rpc.confirmPlayerKey({
+      await program2.rpc.verifyKey({
           accounts: {
               keychain: playerKeychainPda,
               user: key2.publicKey,
@@ -234,7 +233,7 @@ describe("keychain", () => {
 
   it("removes a key from the keychain", async () => {
       // we'll remove the original key (simulate it potentially being a custodial key)
-      await program2.rpc.removePlayerKey(provider.wallet.publicKey, {
+      await program2.rpc.removeKey(provider.wallet.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
               user: key2.publicKey,
@@ -248,7 +247,7 @@ describe("keychain", () => {
 
   it("closes an empty keychain account", async () => {
      // now wallet2 will remove itself (key2) from the keychain (the only key)
-     await program2.rpc.removePlayerKey(key2.publicKey, {
+     await program2.rpc.removeKey(key2.publicKey, {
          accounts: {
             keychain: playerKeychainPda,
             user: key2.publicKey,
