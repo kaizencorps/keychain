@@ -40,6 +40,7 @@ pub mod keychain {
             key: *ctx.accounts.wallet.to_account_info().key,
             verified: true
         };
+
         // keychain.domain = ctx.accounts.domain.key();
         // add to the keychain vector
         keychain.keys.push(key);

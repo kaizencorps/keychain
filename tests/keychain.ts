@@ -144,7 +144,7 @@ describe("keychain", () => {
       );
 
       const player2Wallet = new Keypair();
-      // another way in case we need to create a transaction
+      // player creates his own keychain (and done using a transaction)
       const tx = await program.methods.createKeychain('player2').accounts({
         keychain: player2KeychainPda,
           domain: domainPda,
