@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
-declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
+// declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
+declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
 const KEYCHAIN: &str = "keychain";
 
@@ -9,9 +10,10 @@ pub mod keychain {
     use anchor_lang::AccountsClose;
     use super::*;
 
-    pub fn create_domain(ctx: Context<CreateDomain>, name: String) -> Result <()> {
+    pub fn create_domain(ctx: Context<CreateDomain>, name: String, keychain_cost: u64) -> Result <()> {
         ctx.accounts.domain.authority = *ctx.accounts.authority.key;
         ctx.accounts.domain.bump = *ctx.bumps.get("domain").unwrap();
+
         // let domain_name = name.as_bytes();
         // let mut name = [0u8; 32];
         // name[..domain_name.len()].copy_from_slice(domain_name);
@@ -19,6 +21,9 @@ pub mod keychain {
         // todo: check name length <= 32
 
         ctx.accounts.domain.name = name;
+        ctx.accounts.domain.treasury = ctx.accounts.treasury.key();
+        ctx.accounts.domain.keychain_cost = keychain_cost;
+
         msg!("created domain account: {}", ctx.accounts.domain.key());
         Ok(())
     }
@@ -180,7 +185,7 @@ pub mod keychain {
 #[derive(Accounts)]
 #[instruction(name: String)]
 pub struct CreateDomain<'info> {
-    // space: 8 discriminator + size(Domain) = 40
+    // space: 8 discriminator + size(Domain) = 40 +
     #[account(
         init,
         payer = authority,
@@ -192,6 +197,11 @@ pub struct CreateDomain<'info> {
     #[account(mut)]
     authority: Signer<'info>,
     system_program: Program <'info, System>,
+
+    // this will be the domain's treasury
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account()]
+    treasury: AccountInfo<'info>,
 }
 
 
@@ -262,12 +272,14 @@ pub struct Domain {
     // max size = 32
     name: String,
     authority: Pubkey,
-    bump: u8
+    treasury: Pubkey,
+    keychain_cost: u64,            // the cost to create a keychain
+    bump: u8,
 }
 
 impl Domain {
-    // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
-    pub const MAX_SIZE: usize = 32 + 32 + 1;
+    // 32 byte name
+    pub const MAX_SIZE: usize = 32 + 32 + 32 + 1 + 8;
 }
 
 #[derive(Accounts)]

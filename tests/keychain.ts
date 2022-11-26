@@ -12,8 +12,11 @@ function randomName() {
 }
 
 const domain = randomName();
+const treasury = anchor.web3.Keypair.generate();
 const playername = randomName();
 const adminPlayername = randomName();
+
+const renameCost = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
 
 
 describe("keychain", () => {
@@ -92,6 +95,7 @@ describe("keychain", () => {
 
     console.log(`domain: ${domain}`);
     console.log(`domain pda: ${domainPda.toBase58()}`);
+    console.log(`treasury: ${treasury.publicKey.toBase58()}`);
     console.log(`player keychain pda: ${playerKeychainPda.toBase58()}`);
     console.log(`admin player keychain pda: ${adminPlayerKeychainPda.toBase58()}`);
     console.log(`keychain program ID: ${program.programId.toBase58()}`);
@@ -132,11 +136,12 @@ describe("keychain", () => {
 
       let txid;
 
-      txid = await program.rpc.createDomain(domain, {
+      txid = await program.rpc.createDomain(domain, renameCost, {
           accounts: {
               domain: domainPda,
               authority: provider.wallet.publicKey,
-              systemProgram: SystemProgram.programId
+              systemProgram: SystemProgram.programId,
+              treasury: treasury.publicKey
           }
       });
       console.log(`created domain tx: ${txid}`);
@@ -147,9 +152,10 @@ describe("keychain", () => {
         // console.log('domain: ', domainAcct);
         console.log('domain: ', domainPda.toBase58());
         console.log('-- name: ', domainAcct.name);
+        console.log('-- treasury: ', domainAcct.treasury.toBase58());
         console.log('-- authority: ', domainAcct.authority.toBase58());
+        console.log('-- reaname cost: ', domainAcct.keychainCost.toNumber() / anchor.web3.LAMPORTS_PER_SOL);
         console.log('-- bump: ', domainAcct.bump);
-
 
         console.log(`player keychain key pda: ${playerKeychainKeyPda.toBase58()}`);
 
