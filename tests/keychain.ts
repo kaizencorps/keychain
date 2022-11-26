@@ -209,23 +209,24 @@ describe("keychain", () => {
       let txid = await randomPlayerProgram.rpc.addKey(key2.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
-              key: key2KeyPda,
               domain: domainPda,
               // an existing key
               authority: randomPlayerKeypair.publicKey,
-              systemProgram: SystemProgram.programId,
-              treasury: treasury.publicKey
+              // key: key2KeyPda,
           }
       });
       console.log(`added key ${key2.publicKey.toBase58()} to keychain: ${txid}`);
 
       treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
-      console.log("treasury balance after adding key: ", treasuryBalance);
+      console.log("treasury balance after adding key (should still be 0, gets updated on the verify): ", treasuryBalance);
 
       let keychain = await program.account.keyChain.fetch(playerKeychainPda);
-      let key = await program.account.keyChainKey.fetch(key2KeyPda);
-
-      console.log(`added key from account: ${key.key.toBase58()}`)
+      try {
+          let key = await program.account.keyChainKey.fetch(key2KeyPda);
+          assert.fail("key account shouldn't exist");
+      } catch (err) {
+          // expected - the key account gets created on verify
+      }
 
       // not verified yet
       assert.ok(!keychain.keys[1].verified, 'added key should be verified');
@@ -235,17 +236,14 @@ describe("keychain", () => {
           accounts: {
               domain: domainPda,
               keychain: playerKeychainPda,
-              key: key2KeyPda,
+              // key: key2KeyPda,
               authority: randomPlayerKeypair.publicKey,
-              systemProgram: SystemProgram.programId,
-              treasury: treasury.publicKey
           }
       }).then(() => {
           assert.fail("shoudln't be able to add same key again");
       }).catch(() => {
           // expected
       });
-
 
       // now the key2 account needs to verify
       let tx = new Transaction();
@@ -261,8 +259,15 @@ describe("keychain", () => {
       const program2 = new Program(program.idl, program.programId, provider2);
       txid = await program2.methods.verifyKey().accounts({
           keychain: playerKeychainPda,
+          key: key2KeyPda,
+          domain: domainPda,
+          treasury: treasury.publicKey,
           authority: key2.publicKey,
+          systemProgram: SystemProgram.programId
       }).rpc();
+
+      let key = await program.account.keyChainKey.fetch(key2KeyPda);
+      console.log(`created key account from verifying key: ${key2KeyPda}`);
 
       /*
       const key2Wallet = new Wallet(key2);
@@ -288,6 +293,13 @@ describe("keychain", () => {
   });
 
   it("removes a key from the keychain", async () => {
+      let keychain = await program.account.keyChain.fetch(playerKeychainPda);
+      console.log(`numkeys: ${keychain.numKeys}`);
+      console.log(`keys length: ${keychain.keys.length}`);
+      for (let x = 0; x < keychain.keys.length; x++) {
+          console.log(`--key ${x}: ${keychain.keys[x].key.toBase58()}`);
+      }
+
       // we'll remove the original key (simulate it potentially being a custodial key)
       await randomPlayerProgram.rpc.removeKey(randomPlayerKeypair.publicKey, {
           accounts: {
@@ -309,7 +321,12 @@ describe("keychain", () => {
           //expected
       }
 
-      let keychain = await program.account.keyChain.fetch(playerKeychainPda);
+      keychain = await program.account.keyChain.fetch(playerKeychainPda);
+      console.log(`after numkeys: ${keychain.numKeys}`);
+      console.log(`after keys length: ${keychain.keys.length}`);
+      for (let x = 0; x < keychain.keys.length; x++) {
+          console.log(`--key ${x}: ${keychain.keys[x].key.toBase58()}`);
+      }
       assert.ok(keychain.numKeys == 1, 'should only be 1 key on the keychain');
       assert.ok(keychain.keys.length == 1, 'should only be 1 key on the keychain');
   });
