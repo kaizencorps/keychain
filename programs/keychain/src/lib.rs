@@ -25,7 +25,6 @@ pub mod keychain {
 
     // if done by admin, then the authority needs to be the Domain's authority
     pub fn create_keychain(ctx: Context<CreateKeychain>, _playername: String) -> Result <()> {
-        msg!("creating keychain...");
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
@@ -75,7 +74,7 @@ pub mod keychain {
 
         let mut found_signer = false;
         let mut found_existing = false;
-        let signer = *ctx.accounts.user.to_account_info().key;
+        let signer = *ctx.accounts.authority.to_account_info().key;
 
         // todo: check that the signer is in the keychain & whether this key already exists
         for user_key in &keychain.keys {
@@ -111,7 +110,7 @@ pub mod keychain {
 
         let mut found_signer = false;
 
-        let signer = *ctx.accounts.user.to_account_info().key;
+        let signer = *ctx.accounts.authority.to_account_info().key;
 
         for user_key in &mut *keychain.keys {
             if user_key.key == signer {
@@ -137,7 +136,7 @@ pub mod keychain {
         let mut found_signer = false;
         let mut remove_index = usize::MAX;
 
-        let signer = *ctx.accounts.user.to_account_info().key;
+        let signer = *ctx.accounts.authority.to_account_info().key;
 
         for (index, user_key) in keychain.keys.iter().enumerate() {
         // for &mut &user_key in &keychain.keys {
@@ -160,7 +159,7 @@ pub mod keychain {
         if keychain.num_keys == 0 {
             // close the keychain account if this is the last key
             msg!("No more keys. Destroying keychain");
-            keychain.close(ctx.accounts.user.to_account_info());
+            keychain.close(ctx.accounts.authority.to_account_info());
         }
 
         Ok(())
@@ -269,7 +268,7 @@ pub struct AddKey<'info> {
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub authority: Signer<'info>,
 }
 
 // Confirm the signer who calls the AddGif method to the struct so that we can save it
@@ -280,7 +279,7 @@ pub struct VerifyKey<'info> {
 
     // this needs to be a UserKey on the keychain
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -290,7 +289,7 @@ pub struct RemoveKey<'info> {
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub authority: Signer<'info>,
 }
 
 

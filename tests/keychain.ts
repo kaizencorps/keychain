@@ -193,7 +193,7 @@ describe("keychain", () => {
           accounts: {
               keychain: playerKeychainPda,
               // an existing key
-              user: randomPlayerKeypair.publicKey,
+              authority: randomPlayerKeypair.publicKey,
           }
       });
       console.log(`added key ${key2.publicKey.toBase58()} to keychain: ${txid}`);
@@ -207,7 +207,7 @@ describe("keychain", () => {
       randomPlayerProgram.rpc.addKey(key2.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
-              user: randomPlayerKeypair.publicKey,
+              authority: randomPlayerKeypair.publicKey,
           }
       }).then(() => {
           assert.fail("shoudln't be able to add same key again");
@@ -229,14 +229,14 @@ describe("keychain", () => {
       const program2 = new Program(program.idl, program.programId, provider2);
       txid = await program2.methods.verifyKey().accounts({
           keychain: playerKeychainPda,
-          user: key2.publicKey,
+          authority: key2.publicKey,
       }).rpc();
 
       /*
       const key2Wallet = new Wallet(key2);
       let ix = await program.methods.verifyKey().accounts({
               keychain: playerKeychainPda,
-              user: key2.publicKey,
+              authority: key2.publicKey,
       }).instruction();
       tx.add(ix);
       tx.feePayer = provider.wallet.publicKey;
@@ -260,7 +260,7 @@ describe("keychain", () => {
       await randomPlayerProgram.rpc.removeKey(randomPlayerKeypair.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
-              user: randomPlayerKeypair.publicKey,
+              authority: randomPlayerKeypair.publicKey,
           }
       });
 
@@ -273,7 +273,7 @@ describe("keychain", () => {
      // now wallet2 will remove itself (key2) from the keychain (the only key)
       let tx = await program.methods.removeKey(key2.publicKey).accounts({
           keychain: playerKeychainPda,
-          user: key2.publicKey,
+          authority: key2.publicKey,
       }).transaction();
       let txid = await sendAndConfirmTransaction(provider.connection, tx, [key2]);
       console.log(`removed key and closed keychain account: ${txid}`);
