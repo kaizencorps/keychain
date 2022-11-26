@@ -203,6 +203,9 @@ describe("keychain", () => {
   });
 
   it("Adds a key to the keychain and verifies it", async () => {
+      let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+      console.log("treasury balance before adding key: ", treasuryBalance);
+
       let txid = await randomPlayerProgram.rpc.addKey(key2.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
@@ -210,10 +213,14 @@ describe("keychain", () => {
               domain: domainPda,
               // an existing key
               authority: randomPlayerKeypair.publicKey,
-              systemProgram: SystemProgram.programId
+              systemProgram: SystemProgram.programId,
+              treasury: treasury.publicKey
           }
       });
       console.log(`added key ${key2.publicKey.toBase58()} to keychain: ${txid}`);
+
+      treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+      console.log("treasury balance after adding key: ", treasuryBalance);
 
       let keychain = await program.account.keyChain.fetch(playerKeychainPda);
       let key = await program.account.keyChainKey.fetch(key2KeyPda);
@@ -230,7 +237,8 @@ describe("keychain", () => {
               keychain: playerKeychainPda,
               key: key2KeyPda,
               authority: randomPlayerKeypair.publicKey,
-              systemProgram: SystemProgram.programId
+              systemProgram: SystemProgram.programId,
+              treasury: treasury.publicKey
           }
       }).then(() => {
           assert.fail("shoudln't be able to add same key again");
@@ -307,6 +315,11 @@ describe("keychain", () => {
   });
 
   it("closes an empty keychain account", async () => {
+      let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+      console.log("treasury balance before removing key (and deleting keychain): ", treasuryBalance);
+      let userBalance = await provider.connection.getBalance(key2.publicKey);
+      console.log("user balance before removing key (and deleting keychain): ", userBalance);
+
      // now wallet2 will remove itself (key2) from the keychain (the only key)
       let tx = await program.methods.removeKey(key2.publicKey).accounts({
           domain: domainPda,
@@ -318,8 +331,10 @@ describe("keychain", () => {
       let txid = await sendAndConfirmTransaction(provider.connection, tx, [key2]);
       console.log(`removed key and closed keychain account: ${txid}`);
 
-      let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
-      console.log("treasury balance: ", treasuryBalance);
+      treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+      console.log("treasury balance after removing key: ", treasuryBalance);
+      userBalance = await provider.connection.getBalance(key2.publicKey);
+      console.log("user balance after removing key (and deleting keychain): ", userBalance);
 
       program.account.keyChainKey.fetch(key2KeyPda).then(() => {
           assert.fail("key account shouldn't exist");

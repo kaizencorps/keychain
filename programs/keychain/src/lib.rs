@@ -10,6 +10,11 @@ pub mod keychain {
     use anchor_lang::AccountsClose;
     use super::*;
 
+    use anchor_lang::solana_program::{
+        program::{invoke},
+        system_instruction,
+    };
+
     pub fn create_domain(ctx: Context<CreateDomain>, name: String, keychain_cost: u64) -> Result <()> {
         ctx.accounts.domain.authority = *ctx.accounts.authority.key;
         ctx.accounts.domain.bump = *ctx.bumps.get("domain").unwrap();
@@ -78,23 +83,28 @@ pub mod keychain {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
-        let mut found_existing = false;
         let signer = *ctx.accounts.authority.to_account_info().key;
 
-        // todo: check that the signer is in the keychain & whether this key already exists
+        // check that the signer is in the keychain & whether this key already exists
         for user_key in &keychain.keys {
             if user_key.verified && user_key.key == signer {
                 found_signer = true;
             }
-            if pubkey == user_key.key {
-                found_existing = true;
-            }
         }
 
         require!(found_signer, ErrorCode::SignerNotInKeychain);
-        require!(!found_existing, ErrorCode::KeyAlreadyExists);
 
-        // todo: check keychain size limit ..?
+        // this shouldn't be able to happen anymore with v2 requiring unique keychain keys
+        // require!(!found_existing, ErrorCode::KeyAlreadyExists);
+
+        let domain = &ctx.accounts.domain;
+
+        // check that the payer can pay for this
+        if ctx.accounts.authority.lamports() < domain.keychain_cost {
+            return Err(ErrorCode::NotEnoughSol.into());
+        }
+
+        require!(usize::from(keychain.num_keys) < KeyChain::MAX_KEYS, ErrorCode::MaxKeys);
 
         // Build the struct.
         let player_key = PlayerKey {
@@ -110,6 +120,20 @@ pub mod keychain {
         let keychain_key = &mut ctx.accounts.key;
         keychain_key.key = pubkey;
         keychain_key.keychain = ctx.accounts.keychain.key();
+
+        // pay for this key - transfer sol to treasury
+        invoke(
+            &system_instruction::transfer(
+                ctx.accounts.authority.key,
+                &domain.treasury,
+                domain.keychain_cost,
+            ),
+            &[
+                ctx.accounts.authority.to_account_info().clone(),
+                ctx.accounts.treasury.clone(),
+                ctx.accounts.system_program.to_account_info().clone(),
+            ],
+        )?;
 
         Ok(())
     }
@@ -256,7 +280,8 @@ pub struct KeyChain {
 
 impl KeyChain {
     // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
-    pub const MAX_SIZE: usize = 2 + 32 + (4 + 5 * 33);
+    pub const MAX_KEYS: usize = 5;
+    pub const MAX_SIZE: usize = 2 + 32 + (4 + (KeyChain::MAX_KEYS * 33));
 }
 
 // a "pointer" account which points to the keychain it's attached to. this is to prevent keys from being added ot multiple keychains
@@ -275,7 +300,7 @@ pub struct Domain {
     name: String,
     authority: Pubkey,
     treasury: Pubkey,
-    keychain_cost: u64,            // the cost to create a keychain
+    keychain_cost: u64,            // the cost to add a key to a keychain
     bump: u8,
 }
 
@@ -354,10 +379,14 @@ pub struct RemoveKey<'info> {
 
 #[error_code]
 pub enum ErrorCode {
+    #[msg("You don't have enough SOL")]
+    NotEnoughSol,
     #[msg("The given key account is not the correct PDA for the given address")]
     IncorrectKeyAddress,
     #[msg("That key is already on your keychain")]
     KeyAlreadyExists,
+    #[msg("You cannot add any more keys on your keychain. Remove one first")]
+    MaxKeys,
     #[msg("You are not a valid signer for this keychain")]
     SignerNotInKeychain,
     #[msg("That key doesn't exist on this keychain")]
