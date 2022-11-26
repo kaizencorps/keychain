@@ -58,12 +58,12 @@ pub mod keychain {
          */
 
         // now set up the pointer account
-        let keychain_key = &mut ctx.accounts.keychain_key;
+        let keychain_key = &mut ctx.accounts.key;
         keychain_key.key = ctx.accounts.wallet.key();
         keychain_key.keychain = ctx.accounts.keychain.key();
 
         msg!("created keychain account: {}", ctx.accounts.keychain.key());
-        msg!("created keychain key account: {}", ctx.accounts.keychain_key.key());
+        msg!("created keychain key account: {}", ctx.accounts.key.key());
 
         Ok(())
     }
@@ -206,7 +206,7 @@ pub struct CreateKeychain<'info> {
         space = 8 + (32 * 2)
     )]
     // the first key on this keychain
-    keychain_key: Account<'info, KeyChainKey>,
+    key: Account<'info, KeyChainKey>,
     #[account()]
     domain: Account<'info, Domain>,
     /// CHECK: This is not dangerous because we don't read or write from this account

@@ -148,7 +148,7 @@ describe("keychain", () => {
         // admins can create keychains for anybody, but otherwise the authority and wallet (initial key) need to match
         txid = await randomPlayerProgram.methods.createKeychain(playername).accounts({
             keychain: playerKeychainPda,
-            keychainKey: playerKeychainKeyPda,
+            key: playerKeychainKeyPda,
             domain: domainPda,
             authority: randomPlayerKeypair.publicKey,
             wallet: randomPlayerKeypair.publicKey,
@@ -174,7 +174,7 @@ describe("keychain", () => {
           await program.rpc.createKeychain(playername, {
               accounts: {
                   keychain: playerKeychainPda,
-                  keychainKey: playerKeychainKeyPda,
+                  key: playerKeychainKeyPda,
                   domain: domainPda,
                   authority: provider.wallet.publicKey,
                   wallet: provider.wallet.publicKey,
@@ -214,6 +214,7 @@ describe("keychain", () => {
       }).catch(() => {
           // expected
       });
+
 
       // now the key2 account needs to verify
       let tx = new Transaction();
