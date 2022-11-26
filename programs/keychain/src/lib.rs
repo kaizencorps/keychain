@@ -168,11 +168,13 @@ pub mod keychain {
 
         // now close the key account
         let keychain_key = &mut ctx.accounts.key;
-        keychain_key.close(ctx.accounts.authority.to_account_info());
+        // send the lamports for closing to the domain treasury
+        // keychain_key.close(ctx.accounts.treasury.to_account_info());
 
         if keychain.num_keys == 0 {
             // close the keychain account if this is the last key
             msg!("No more keys. Destroying keychain");
+            // the keychain account lamports get sent to the authority that removed the last key
             keychain.close(ctx.accounts.authority.to_account_info());
         }
 
@@ -296,8 +298,13 @@ pub struct AddKey<'info> {
     )]
     // the first key on this keychain
     key: Account<'info, KeyChainKey>,
-    #[account()]
+
+    #[account(has_one = treasury)]
     domain: Account<'info, Domain>,
+
+    /// CHECK: not sure why the address or constraint check doesn't work (see the remove key)
+    #[account(mut, address = domain.treasury)]
+    treasury: AccountInfo<'info>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
@@ -326,16 +333,22 @@ pub struct RemoveKey<'info> {
     #[account(
         seeds = [pubkey.as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
-        mut
+        mut,
+        close = treasury
     )]
     key: Account<'info, KeyChainKey>,
 
-    #[account()]
+    #[account(has_one = treasury)]
     domain: Account<'info, Domain>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
     authority: Signer<'info>,
+
+    // #[account(mut, constraint = *treasury.key == domain.treasury)]
+    /// CHECK: not sure why the address or constraint check doesn't work, but regardless we're checking on the domain w/has_one
+    #[account(mut, address = domain.treasury)]
+    treasury: AccountInfo<'info>
 }
 
 

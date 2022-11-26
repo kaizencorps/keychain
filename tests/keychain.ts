@@ -287,8 +287,12 @@ describe("keychain", () => {
               key: playerKeychainKeyPda,
               domain: domainPda,
               authority: randomPlayerKeypair.publicKey,
+              treasury: treasury.publicKey
           }
       });
+
+      let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+      console.log("treasury balance: ", treasuryBalance);
 
       try {
           let keyAccount = await program.account.keyChainKey.fetch(playerKeychainKeyPda);
@@ -309,9 +313,13 @@ describe("keychain", () => {
           keychain: playerKeychainPda,
           key: key2KeyPda,
           authority: key2.publicKey,
+          treasury: treasury.publicKey
       }).transaction();
       let txid = await sendAndConfirmTransaction(provider.connection, tx, [key2]);
       console.log(`removed key and closed keychain account: ${txid}`);
+
+      let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+      console.log("treasury balance: ", treasuryBalance);
 
       program.account.keyChainKey.fetch(key2KeyPda).then(() => {
           assert.fail("key account shouldn't exist");
