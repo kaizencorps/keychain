@@ -72,6 +72,15 @@ describe("keychain", () => {
         program.programId
     );
 
+    const [key2KeyPda, key2KeyPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
+        [
+            key2.publicKey.toBuffer(),
+            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
+        ],
+        program.programId
+    );
+
     const [adminPlayerKeychainPda, adminPlayerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
             Buffer.from(anchor.utils.bytes.utf8.encode(adminPlayername)),
@@ -188,17 +197,22 @@ describe("keychain", () => {
   });
 
   it("Adds a key to the keychain and verifies it", async () => {
-
       let txid = await randomPlayerProgram.rpc.addKey(key2.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
+              key: key2KeyPda,
+              domain: domainPda,
               // an existing key
               authority: randomPlayerKeypair.publicKey,
+              systemProgram: SystemProgram.programId
           }
       });
       console.log(`added key ${key2.publicKey.toBase58()} to keychain: ${txid}`);
 
       let keychain = await program.account.keyChain.fetch(playerKeychainPda);
+      let key = await program.account.keyChainKey.fetch(key2KeyPda);
+
+      console.log(`added key from account: ${key.key.toBase58()}`)
 
       // not verified yet
       assert.ok(!keychain.keys[1].verified, 'added key should be verified');
@@ -206,8 +220,11 @@ describe("keychain", () => {
       // try to add again and we fail (already there)
       randomPlayerProgram.rpc.addKey(key2.publicKey, {
           accounts: {
+              domain: domainPda,
               keychain: playerKeychainPda,
+              key: key2KeyPda,
               authority: randomPlayerKeypair.publicKey,
+              systemProgram: SystemProgram.programId
           }
       }).then(() => {
           assert.fail("shoudln't be able to add same key again");
@@ -261,9 +278,18 @@ describe("keychain", () => {
       await randomPlayerProgram.rpc.removeKey(randomPlayerKeypair.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
+              key: playerKeychainKeyPda,
+              domain: domainPda,
               authority: randomPlayerKeypair.publicKey,
           }
       });
+
+      try {
+          let keyAccount = await program.account.keyChainKey.fetch(playerKeychainKeyPda);
+          assert.fail("key account should no longer exist");
+      } catch (err) {
+          //expected
+      }
 
       let keychain = await program.account.keyChain.fetch(playerKeychainPda);
       assert.ok(keychain.numKeys == 1, 'should only be 1 key on the keychain');
@@ -273,15 +299,23 @@ describe("keychain", () => {
   it("closes an empty keychain account", async () => {
      // now wallet2 will remove itself (key2) from the keychain (the only key)
       let tx = await program.methods.removeKey(key2.publicKey).accounts({
+          domain: domainPda,
           keychain: playerKeychainPda,
+          key: key2KeyPda,
           authority: key2.publicKey,
       }).transaction();
       let txid = await sendAndConfirmTransaction(provider.connection, tx, [key2]);
       console.log(`removed key and closed keychain account: ${txid}`);
 
-      // account shouldn't exist now
+      program.account.keyChainKey.fetch(key2KeyPda).then(() => {
+          assert.fail("key account shouldn't exist");
+      }).catch(() => {
+          // expected
+      });
+
+      // keychain account shouldn't exist now
       program.account.keyChain.fetch(playerKeychainPda).then(() => {
-          assert.fail("account shouldn't exist");
+          assert.fail("keychain account shouldn't exist");
       }).catch(() => {
           // expected
       });

@@ -57,19 +57,19 @@ pub mod keychain {
         }
          */
 
-        // now set up the pointer account
+        // now set up the pointer/map account
         let keychain_key = &mut ctx.accounts.key;
         keychain_key.key = ctx.accounts.wallet.key();
         keychain_key.keychain = ctx.accounts.keychain.key();
 
         msg!("created keychain account: {}", ctx.accounts.keychain.key());
-        msg!("created keychain key account: {}", ctx.accounts.key.key());
+        msg!("created key account: {}", ctx.accounts.key.key());
 
         Ok(())
     }
 
     // user w/existing keychain (and verified key), adds a new (unverified) key
-    pub fn add_key(ctx: Context<AddKey>, key: Pubkey) -> Result <()> {
+    pub fn add_key(ctx: Context<AddKey>, pubkey: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -81,7 +81,7 @@ pub mod keychain {
             if user_key.verified && user_key.key == signer {
                 found_signer = true;
             }
-            if key == user_key.key {
+            if pubkey == user_key.key {
                 found_existing = true;
             }
         }
@@ -92,14 +92,19 @@ pub mod keychain {
         // todo: check keychain size limit ..?
 
         // Build the struct.
-        let key = PlayerKey {
-            key: key,
+        let player_key = PlayerKey {
+            key: pubkey,
             verified: false,
         };
 
         // Add it to the keychain.
-        keychain.keys.push(key);
+        keychain.keys.push(player_key);
         keychain.num_keys += 1;
+
+        // now set up the pointer/map account
+        let keychain_key = &mut ctx.accounts.key;
+        keychain_key.key = pubkey;
+        keychain_key.keychain = ctx.accounts.keychain.key();
 
         Ok(())
     }
@@ -130,7 +135,7 @@ pub mod keychain {
     }
 
     // remove a key from a keychain
-    pub fn remove_key(ctx: Context<RemoveKey>, key: Pubkey) -> Result <()> {
+    pub fn remove_key(ctx: Context<RemoveKey>, pubkey: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
@@ -143,7 +148,7 @@ pub mod keychain {
             if user_key.key == signer {
                 found_signer = true;
             }
-            if key == user_key.key {
+            if pubkey == user_key.key {
                 remove_index = index;
             }
         }
@@ -155,6 +160,10 @@ pub mod keychain {
 
         // decrement
         keychain.num_keys -= 1;
+
+        // now close the key account
+        let keychain_key = &mut ctx.accounts.key;
+        keychain_key.close(ctx.accounts.authority.to_account_info());
 
         if keychain.num_keys == 0 {
             // close the keychain account if this is the last key
@@ -262,13 +271,26 @@ impl Domain {
 }
 
 #[derive(Accounts)]
+#[instruction(pubkey: Pubkey)]
 pub struct AddKey<'info> {
     #[account(mut)]
     pub keychain: Account<'info, KeyChain>,
+    #[account(
+        init,
+        payer = authority,
+        seeds = [pubkey.as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + (32 * 2)
+    )]
+    // the first key on this keychain
+    key: Account<'info, KeyChainKey>,
+    #[account()]
+    domain: Account<'info, Domain>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
-    pub authority: Signer<'info>,
+    authority: Signer<'info>,
+    system_program: Program <'info, System>,
 }
 
 // Confirm the signer who calls the AddGif method to the struct so that we can save it
@@ -279,17 +301,29 @@ pub struct VerifyKey<'info> {
 
     // this needs to be a UserKey on the keychain
     #[account(mut)]
-    pub authority: Signer<'info>,
+    authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
+#[instruction(pubkey: Pubkey)]
 pub struct RemoveKey<'info> {
     #[account(mut)]
-    pub keychain: Account<'info, KeyChain>,
+    keychain: Account<'info, KeyChain>,
+
+    // the key account that will need to be removed
+    #[account(
+        seeds = [pubkey.as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        mut
+    )]
+    key: Account<'info, KeyChainKey>,
+
+    #[account()]
+    domain: Account<'info, Domain>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
-    pub authority: Signer<'info>,
+    authority: Signer<'info>,
 }
 
 
