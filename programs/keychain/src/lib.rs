@@ -24,7 +24,8 @@ pub mod keychain {
     }
 
     // if done by admin, then the authority needs to be the Domain's authority
-    pub fn create_keychain(ctx: Context<CreateKeychain>, playername: String) -> Result <()> {
+    pub fn create_keychain(ctx: Context<CreateKeychain>, _playername: String) -> Result <()> {
+        msg!("creating keychain...");
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
@@ -46,7 +47,24 @@ pub mod keychain {
         keychain.keys.push(key);
         keychain.num_keys = 1;
 
+        // first, verify the keychain_key derivation matches the given one (since they need to be unique)
+        /*
+        let (keychain_key_address, _keychain_key_bump) =
+            Pubkey::find_program_address(&[ctx.accounts.keychain_key.key().as_ref(), ctx.accounts.domain.name.as_bytes(), KEYCHAIN.as_bytes()], ctx.program_id);
+
+        if ctx.accounts.keychain_key.key() != keychain_key_address {
+            msg!("derived keychain key account (pointer) doesn't match: {}", keychain_key_address);
+            return Err(ErrorCode::IncorrectKeyAddress.into());
+        }
+         */
+
+        // now set up the pointer account
+        let keychain_key = &mut ctx.accounts.keychain_key;
+        keychain_key.key = ctx.accounts.wallet.key();
+        keychain_key.keychain = ctx.accounts.keychain.key();
+
         msg!("created keychain account: {}", ctx.accounts.keychain.key());
+        msg!("created keychain key account: {}", ctx.accounts.keychain_key.key());
 
         Ok(())
     }
@@ -181,6 +199,15 @@ pub struct CreateKeychain<'info> {
         space = 8 + KeyChain::MAX_SIZE
     )]
     keychain: Account<'info, KeyChain>,
+    #[account(
+        init,
+        payer = authority,
+        seeds = [wallet.key().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + (32 * 2)
+    )]
+    // the first key on this keychain
+    keychain_key: Account<'info, KeyChainKey>,
     #[account()]
     domain: Account<'info, Domain>,
     /// CHECK: This is not dangerous because we don't read or write from this account
@@ -209,7 +236,16 @@ pub struct KeyChain {
 
 impl KeyChain {
     // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
-    pub const MAX_SIZE: usize = 2 + 32 + (4 + 3 * 33);
+    pub const MAX_SIZE: usize = 2 + 32 + (4 + 5 * 33);
+}
+
+// a "pointer" account which points to the keychain it's attached to. this is to prevent keys from being added ot multiple keychains
+#[account]
+pub struct KeyChainKey {
+    // pointer to the keychain this key is attached to
+    keychain: Pubkey,
+    // the key/wallet this key holds - matches the one in the keychain
+    key: Pubkey,
 }
 
 // domains are needed for admin functions
@@ -260,6 +296,8 @@ pub struct RemoveKey<'info> {
 
 #[error_code]
 pub enum ErrorCode {
+    #[msg("The given key account is not the correct PDA for the given address")]
+    IncorrectKeyAddress,
     #[msg("That key is already on your keychain")]
     KeyAlreadyExists,
     #[msg("You are not a valid signer for this keychain")]
