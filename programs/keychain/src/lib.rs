@@ -82,6 +82,7 @@ pub mod keychain {
         // add to the keychain vector
         keychain.keys.push(key);
         keychain.num_keys = 1;
+        keychain.domain = *ctx.accounts.domain.to_account_info().key;
 
         // first, verify the keychain_key derivation matches the given one (since they need to be unique)
         /*
