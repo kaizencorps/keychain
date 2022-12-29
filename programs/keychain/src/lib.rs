@@ -1,19 +1,28 @@
 use anchor_lang::prelude::*;
+use crate::program::Keychain;
 
-// declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
-declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
+declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
+// declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
 const KEYCHAIN: &str = "keychain";
 
+// the space for keychain pdas
+const KEYCHAIN_SPACE: &str = "keychains";
+// the space for keychain key pdas
+const KEY_SPACE: &str = "keys";
+
+// todo: use realloc to enable any number of keys instead of limiting to 5
+
 #[program]
 pub mod keychain {
-    use anchor_lang::AccountsClose;
+    use anchor_lang::{AccountsClose, system_program};
     use super::*;
 
     use anchor_lang::solana_program::{
         program::{invoke},
         system_instruction,
     };
+    use anchor_lang::solana_program::program::invoke_signed;
 
     pub fn create_domain(ctx: Context<CreateDomain>, name: String, keychain_cost: u64) -> Result <()> {
         ctx.accounts.domain.authority = *ctx.accounts.authority.key;
@@ -30,6 +39,24 @@ pub mod keychain {
         ctx.accounts.domain.keychain_cost = keychain_cost;
 
         msg!("created domain account: {}", ctx.accounts.domain.key());
+        Ok(())
+    }
+
+    // todo: make this callable by the domain admin. currently this is a super-admin function
+
+    // just for closing the domain account
+    pub fn close_account(ctx: Context<CloseAccount>) -> Result<()> {
+
+        let remaining_lamports = ctx.accounts.account.lamports();
+
+        msg!("transfering all lamports out of account (to close) {}: {}", ctx.accounts.account.key(), remaining_lamports);
+
+        // transfer sol: https://solanacookbook.com/references/programs.html#how-to-transfer-sol-in-a-program
+
+        // Debit from_account and credit to_account
+        **ctx.accounts.account.try_borrow_mut_lamports()? -= remaining_lamports;
+        **ctx.accounts.authority.try_borrow_mut_lamports()? += remaining_lamports;
+
         Ok(())
     }
 
@@ -243,7 +270,7 @@ pub struct CreateDomain<'info> {
     #[account(
         init,
         payer = authority,
-        seeds = [name.as_bytes().as_ref(), "keychain".as_bytes().as_ref()],
+        seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         space = 8 + Domain::MAX_SIZE,
     )]
@@ -258,6 +285,27 @@ pub struct CreateDomain<'info> {
     treasury: AccountInfo<'info>,
 }
 
+// use to destroy a Domain, keychain, or whatever account
+
+#[derive(Accounts)]
+pub struct CloseAccount<'info> {
+
+    // this must be the upgrade authority (super-admin) - will receive the lamports
+    #[account(mut)]
+    authority: Signer<'info>,
+
+    /// CHECK: this account gets closed, authority needs to be upgrade authority
+    #[account(mut)]
+    account: AccountInfo<'info>,
+
+    // from: https://docs.rs/anchor-lang/latest/anchor_lang/accounts/account/struct.Account.html
+    // only allow the upgrade authority (deployer) to call this
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    program: Program<'info, Keychain>,
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
+    program_data: Account<'info, ProgramData>,
+    // system_program: Program<'info, System>,
+}
 
 #[derive(Accounts)]
 #[instruction(playername: String)]
@@ -266,7 +314,7 @@ pub struct CreateKeychain<'info> {
     #[account(
         init,
         payer = authority,
-        seeds = [playername.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        seeds = [playername.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         space = 8 + KeyChain::MAX_SIZE
     )]
@@ -274,7 +322,7 @@ pub struct CreateKeychain<'info> {
     #[account(
         init,
         payer = authority,
-        seeds = [wallet.key().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         space = 8 + (32 * 2)
     )]
@@ -356,7 +404,6 @@ pub struct AddKey<'info> {
     authority: Signer<'info>,
 }
 
-// Confirm the signer who calls the AddGif method to the struct so that we can save it
 #[derive(Accounts)]
 pub struct VerifyKey<'info> {
     #[account(mut)]
@@ -366,7 +413,7 @@ pub struct VerifyKey<'info> {
     #[account(
         init,
         payer = authority,
-        seeds = [authority.key().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         space = 8 + (32 * 2)
     )]
@@ -395,7 +442,7 @@ pub struct RemoveKey<'info> {
     // the key account that will need to be removed
     // we close manually instead of using the close attribute since an unverified key won't have the corresponding account
     #[account(
-        seeds = [pubkey.as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        seeds = [pubkey.as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         mut,
     )]

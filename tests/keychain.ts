@@ -6,6 +6,8 @@ import {Keypair, PublicKey, sendAndConfirmTransaction, Transaction} from "@solan
 const { SystemProgram } = anchor.web3;
 
 const KEYCHAIN = 'keychain';
+const KEYCHAIN_SPACE = 'keychains';
+const KEY_SPACE = 'keys';
 
 function randomName() {
     return Math.random().toString(36).substring(2, 5) + Math.random().toString(36).substring(2, 5);
@@ -20,12 +22,12 @@ const renameCost = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
 
 
 describe("keychain", () => {
-  // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env()
-  anchor.setProvider(provider);
+    // Configure the client to use the local cluster.
+    const provider = anchor.AnchorProvider.env()
+    anchor.setProvider(provider);
 
-  // standard program using the provider/account in anchor.toml
-  const program = anchor.workspace.Keychain as Program<Keychain>;
+    // standard program using the provider/account in anchor.toml
+    const program = anchor.workspace.Keychain as Program<Keychain>;
 
     // original wallet that sets up the keychain
     const randomPlayerKeypair = anchor.web3.Keypair.generate();
@@ -59,6 +61,7 @@ describe("keychain", () => {
     const [playerKeychainPda, playerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
             Buffer.from(anchor.utils.bytes.utf8.encode(playername)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN_SPACE)),
             Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
             Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
         ],
@@ -69,6 +72,7 @@ describe("keychain", () => {
     const [playerKeychainKeyPda, playerKeychainKeyPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
             randomPlayerKeypair.publicKey.toBuffer(),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEY_SPACE)),
             Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
             Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
         ],
@@ -78,6 +82,7 @@ describe("keychain", () => {
     const [key2KeyPda, key2KeyPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
             key2.publicKey.toBuffer(),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEY_SPACE)),
             Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
             Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
         ],
@@ -87,6 +92,7 @@ describe("keychain", () => {
     const [adminPlayerKeychainPda, adminPlayerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
         [
             Buffer.from(anchor.utils.bytes.utf8.encode(adminPlayername)),
+            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN_SPACE)),
             Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
             Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
         ],
@@ -367,4 +373,29 @@ describe("keychain", () => {
       });
   });
 
-});
+    it('destroys the domain', async () => {
+
+        // program.state.address()
+
+        let tx = await program.methods.closeAccount().accounts({
+            account: domainPda,
+            authority: provider.wallet.publicKey,
+            program: program.programId,
+            // note: don't know how to get this guy when the shit gets deployed
+            programData: new anchor.web3.PublicKey('GfaotbMSYQqjKYmCRPMwr7bGtbfRWZBqYvUuabL29o2W'),
+        }).rpc();
+
+        console.log(`destroyed domain: ${tx}`);
+
+        try {
+            await program.account.domain.fetch(domainPda);
+            assert.fail("domain account shouldn't exist");
+        } catch (err) {
+            // expected
+        }
+    });
+
+}
+
+
+);
