@@ -28,11 +28,8 @@ pub mod keychain {
         ctx.accounts.domain.authority = *ctx.accounts.authority.key;
         ctx.accounts.domain.bump = *ctx.bumps.get("domain").unwrap();
 
-        // let domain_name = name.as_bytes();
-        // let mut name = [0u8; 32];
-        // name[..domain_name.len()].copy_from_slice(domain_name);
-
-        // todo: check name length <= 32
+        // check name length <= 32
+        require!(name.as_bytes().len() <= 32, ErrorCode::NameTooLong);
 
         ctx.accounts.domain.name = name;
         ctx.accounts.domain.treasury = ctx.accounts.treasury.key();
@@ -61,7 +58,8 @@ pub mod keychain {
     }
 
     // if done by admin, then the authority needs to be the Domain's authority
-    pub fn create_keychain(ctx: Context<CreateKeychain>, _playername: String) -> Result <()> {
+    pub fn create_keychain(ctx: Context<CreateKeychain>, keychain_name: String) -> Result <()> {
+        require!(keychain_name.as_bytes().len() <= 32, ErrorCode::NameTooLong);
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
@@ -73,13 +71,14 @@ pub mod keychain {
         }
 
         let keychain = &mut ctx.accounts.keychain;
-        let key = PlayerKey {
+        let key = UserKey {
             key: *ctx.accounts.wallet.to_account_info().key,
             verified: true
         };
 
         // keychain.domain = ctx.accounts.domain.key();
         // add to the keychain vector
+        keychain.name = keychain_name;
         keychain.keys.push(key);
         keychain.num_keys = 1;
         keychain.domain = *ctx.accounts.domain.to_account_info().key;
@@ -148,7 +147,7 @@ pub mod keychain {
 
 
         // Build the struct.
-        let player_key = PlayerKey {
+        let player_key = UserKey {
             key: pubkey,
             verified: false,
         };
@@ -232,10 +231,20 @@ pub mod keychain {
                 verified = user_key.verified;
             }
         }
+        // see if this is an admin
+        let mut admin = false;
 
-        require!(found_signer, ErrorCode::SignerNotInKeychain);
+        // if the signer is the same as the domain authority, then this is a domain admin
+        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
+            admin = true;
+        }
+
         require!(remove_index != usize::MAX, ErrorCode::KeyNotFound);
 
+        // admins can remove keys
+        if !admin {
+            require!(found_signer, ErrorCode::SignerNotInKeychain);
+        }
 
         let removed_key = keychain.keys.swap_remove(remove_index);
         msg!("removed key at index: {}: {}", remove_index, removed_key.key);
@@ -309,13 +318,13 @@ pub struct CloseAccount<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(playername: String)]
+#[instruction(keychanin_name: String)]
 pub struct CreateKeychain<'info> {
     // space: 8 discriminator + KeyChain::MAX_SIZE
     #[account(
         init,
         payer = authority,
-        seeds = [playername.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        seeds = [keychanin_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
         bump,
         space = 8 + KeyChain::MAX_SIZE
     )]
@@ -338,9 +347,9 @@ pub struct CreateKeychain<'info> {
     system_program: Program <'info, System>,
 }
 
-// Create a custom struct for us to work with.
+// represents a user's wallet
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct PlayerKey {
+pub struct UserKey {
     // size = 1 + 32 = 33
     pub key: Pubkey,
     pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
@@ -349,36 +358,38 @@ pub struct PlayerKey {
 // todo: might wanna store the "display" version of the playername since the account should be derived from a "normalized" version of the playername
 #[account]
 pub struct KeyChain {
-    num_keys: u16,
-    domain: Pubkey,
+    // name for the keychain. can be used as a username
+    pub name: String,
+    pub num_keys: u16,
+    pub domain: Pubkey,
     // Attach a Vector of type ItemStruct to the account.
-    keys: Vec<PlayerKey>,
+    pub keys: Vec<UserKey>,
 }
 
 impl KeyChain {
     // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
     pub const MAX_KEYS: usize = 5;
-    pub const MAX_SIZE: usize = 2 + 32 + (4 + (KeyChain::MAX_KEYS * 33));
+    pub const MAX_SIZE: usize = 2 + 32 + 32 + (4 + (KeyChain::MAX_KEYS * 33));
 }
 
-// a "pointer" account which points to the keychain it's attached to. this is to prevent keys from being added ot multiple keychains
+// a "pointer" account which points to the keychain it's attached to. prevent keys from being added ot multiple keychains
 #[account]
 pub struct KeyChainKey {
     // pointer to the keychain this key is attached to
-    keychain: Pubkey,
+    pub keychain: Pubkey,
     // the key/wallet this key holds - matches the one in the keychain
-    key: Pubkey,
+    pub key: Pubkey,
 }
 
 // domains are needed for admin functions
 #[account]
 pub struct Domain {
     // max size = 32
-    name: String,
-    authority: Pubkey,
-    treasury: Pubkey,
-    keychain_cost: u64,            // the cost to add a key to a keychain
-    bump: u8,
+    pub name: String,
+    pub authority: Pubkey,
+    pub treasury: Pubkey,
+    pub keychain_cost: u64,            // the cost to add a key to a keychain
+    pub bump: u8,
 }
 
 impl Domain {
@@ -481,6 +492,8 @@ pub enum ErrorCode {
     NotDomainAdmin,
     #[msg("Can only add wallet of signer")]
     NotSigner,
+    #[msg("Name too long. Max 32 characters")]
+    NameTooLong,
 
 }
 

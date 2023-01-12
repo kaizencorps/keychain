@@ -160,7 +160,7 @@ describe("keychain", () => {
         console.log('-- name: ', domainAcct.name);
         console.log('-- treasury: ', domainAcct.treasury.toBase58());
         console.log('-- authority: ', domainAcct.authority.toBase58());
-        console.log('-- reaname cost: ', domainAcct.keychainCost.toNumber() / anchor.web3.LAMPORTS_PER_SOL);
+        console.log('-- rename cost: ', domainAcct.keychainCost.toNumber() / anchor.web3.LAMPORTS_PER_SOL);
         console.log('-- bump: ', domainAcct.bump);
 
         console.log(`player keychain key pda: ${playerKeychainKeyPda.toBase58()}`);
