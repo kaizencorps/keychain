@@ -312,6 +312,7 @@ pub struct CloseAccount<'info> {
     // only allow the upgrade authority (deployer) to call this
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     program: Program<'info, Keychain>,
+
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
     program_data: Account<'info, ProgramData>,
     // system_program: Program<'info, System>,
