@@ -4,6 +4,9 @@ use crate::program::Keychain;
 declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
 // declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
+pub mod context;
+pub mod account;
+
 const KEYCHAIN: &str = "keychain";
 
 // the space for keychain pdas
@@ -12,6 +15,9 @@ const KEYCHAIN_SPACE: &str = "keychains";
 const KEY_SPACE: &str = "keys";
 
 // todo: use realloc to enable any number of keys instead of limiting to 5
+
+use context::*;
+use account::*;
 
 #[program]
 pub mod keychain {
@@ -271,208 +277,6 @@ pub mod keychain {
     }
 }
 
-// create a domain account for admin usage
-
-#[derive(Accounts)]
-#[instruction(name: String)]
-pub struct CreateDomain<'info> {
-    // space: 8 discriminator + size(Domain) = 40 +
-    #[account(
-        init,
-        payer = authority,
-        seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-        bump,
-        space = 8 + Domain::MAX_SIZE,
-    )]
-    domain: Account<'info, Domain>,
-    #[account(mut)]
-    authority: Signer<'info>,
-    system_program: Program <'info, System>,
-
-    // this will be the domain's treasury
-    /// CHECK: This is not dangerous because we don't read or write from this account
-    #[account()]
-    treasury: AccountInfo<'info>,
-}
-
-// use to destroy a Domain, keychain, or whatever account
-
-#[derive(Accounts)]
-pub struct CloseAccount<'info> {
-
-    // this must be the upgrade authority (super-admin) - will receive the lamports
-    #[account(mut)]
-    authority: Signer<'info>,
-
-    /// CHECK: this account gets closed, authority needs to be upgrade authority
-    #[account(mut)]
-    account: AccountInfo<'info>,
-
-    // from: https://docs.rs/anchor-lang/latest/anchor_lang/accounts/account/struct.Account.html
-    // only allow the upgrade authority (deployer) to call this
-    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
-    program: Program<'info, Keychain>,
-
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
-    program_data: Account<'info, ProgramData>,
-    // system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(keychanin_name: String)]
-pub struct CreateKeychain<'info> {
-    // space: 8 discriminator + KeyChain::MAX_SIZE
-    #[account(
-        init,
-        payer = authority,
-        seeds = [keychanin_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-        bump,
-        space = 8 + KeyChain::MAX_SIZE
-    )]
-    keychain: Account<'info, KeyChain>,
-    #[account(
-        init,
-        payer = authority,
-        seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-        bump,
-        space = 8 + (32 * 2)
-    )]
-    // the first key on this keychain
-    key: Account<'info, KeyChainKey>,
-    #[account()]
-    domain: Account<'info, Domain>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
-    wallet: AccountInfo<'info>,
-    #[account(mut)]
-    authority: Signer<'info>,
-    system_program: Program <'info, System>,
-}
-
-// represents a user's wallet
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct UserKey {
-    // size = 1 + 32 = 33
-    pub key: Pubkey,
-    pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
-}
-
-// todo: might wanna store the "display" version of the playername since the account should be derived from a "normalized" version of the playername
-#[account]
-pub struct KeyChain {
-    // name for the keychain. can be used as a username
-    pub name: String,
-    pub num_keys: u16,
-    pub domain: Pubkey,
-    // Attach a Vector of type ItemStruct to the account.
-    pub keys: Vec<UserKey>,
-}
-
-impl KeyChain {
-    // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
-    pub const MAX_KEYS: usize = 5;
-    pub const MAX_SIZE: usize = 2 + 32 + 32 + (4 + (KeyChain::MAX_KEYS * 33));
-}
-
-// a "pointer" account which points to the keychain it's attached to. prevent keys from being added ot multiple keychains
-#[account]
-pub struct KeyChainKey {
-    // pointer to the keychain this key is attached to
-    pub keychain: Pubkey,
-    // the key/wallet this key holds - matches the one in the keychain
-    pub key: Pubkey,
-}
-
-// domains are needed for admin functions
-#[account]
-pub struct Domain {
-    // max size = 32
-    pub name: String,
-    pub authority: Pubkey,
-    pub treasury: Pubkey,
-    pub keychain_cost: u64,            // the cost to add a key to a keychain
-    pub bump: u8,
-}
-
-impl Domain {
-    // 32 byte name
-    pub const MAX_SIZE: usize = 32 + 32 + 32 + 1 + 8;
-}
-
-#[derive(Accounts)]
-#[instruction(pubkey: Pubkey)]
-pub struct AddKey<'info> {
-    #[account(mut)]
-    keychain: Account<'info, KeyChain>,
-
-    // -- this doesn't work cause anchor expects a passed in account to be initialized
-    // this gets passed in but NOT initialized - just checked for existence
-    // key: Account<'info, KeyChainKey>,
-
-    /// CHECK: just reading
-    #[account()]
-    domain: Account<'info, Domain>,
-
-    // this needs to be an existing (and verified) UserKey in the keychain
-    #[account(mut)]
-    authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct VerifyKey<'info> {
-    #[account(mut)]
-    pub keychain: Account<'info, KeyChain>,
-
-    // the key account gets created here
-    #[account(
-        init,
-        payer = authority,
-        seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-        bump,
-        space = 8 + (32 * 2)
-    )]
-    key: Account<'info, KeyChainKey>,
-
-    // this needs to be a UserKey on the keychain
-    #[account(mut)]
-    authority: Signer<'info>,
-
-    #[account(has_one = treasury)]
-    domain: Account<'info, Domain>,
-
-    /// CHECK: not sure why the address or constraint check doesn't work (see the remove key)
-    #[account(mut, address = domain.treasury)]
-    treasury: AccountInfo<'info>,
-
-    system_program: Program <'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(pubkey: Pubkey)]
-pub struct RemoveKey<'info> {
-    #[account(mut)]
-    keychain: Account<'info, KeyChain>,
-
-    // the key account that will need to be removed
-    // we close manually instead of using the close attribute since an unverified key won't have the corresponding account
-    #[account(
-        seeds = [pubkey.as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-        bump,
-        mut,
-    )]
-    key: Account<'info, KeyChainKey>,
-
-    #[account(has_one = treasury)]
-    domain: Account<'info, Domain>,
-
-    // this needs to be an existing (and verified) UserKey in the keychain
-    #[account(mut)]
-    authority: Signer<'info>,
-
-    // #[account(mut, constraint = *treasury.key == domain.treasury)]
-    /// CHECK: not sure why the address or constraint check doesn't work, but regardless we're checking on the domain w/has_one
-    #[account(mut, address = domain.treasury)]
-    treasury: AccountInfo<'info>
-}
 
 
 #[error_code]
