@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
+use keychain::program::Keychain;
 use keychain::KeyChain;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("5eTyYWF8YyvC7TKmj4iZATLw4gDBD6eP1jVp6sYwddD6");
 
 const PROFILE: &str = "profile";
 
@@ -69,9 +70,9 @@ pub struct CreateProfile<'info> {
     #[account(mut)]
     user: Signer<'info>,
     system_program: Program <'info, System>,
+    keychain_program: Program <'info, Keychain>,
 
-    /// CHECK: just reading
-    #[account()]
+    #[account(owner = keychain_program.key())]
     keychain: Account<'info, KeyChain>,
 }
 
@@ -84,9 +85,9 @@ pub struct SetPfp<'info> {
     profile: Account<'info, Profile>,
     #[account(mut)]
     user: Signer<'info>,
+    keychain_program: Program <'info, Keychain>,
 
-    /// CHECK: just reading
-    #[account()]
+    #[account(owner = keychain_program.key())]
     keychain: Account<'info, KeyChain>,
 
 }

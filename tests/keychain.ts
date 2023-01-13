@@ -4,9 +4,12 @@ import { Keychain } from "../target/types/keychain";
 import { Profile } from "../target/types/profile";
 import * as assert from "assert";
 import {Keypair, PublicKey, sendAndConfirmTransaction, Transaction} from "@solana/web3.js";
+import {createAssociatedTokenAccount, createMint, mintToChecked} from "@solana/spl-token";
+import {createNFTMint} from "./utils";
 const { SystemProgram } = anchor.web3;
 
 const KEYCHAIN = 'keychain';
+const PROFILE = 'profile';
 const KEYCHAIN_SPACE = 'keychains';
 const KEY_SPACE = 'keys';
 
@@ -17,6 +20,7 @@ function randomName() {
 const domain = randomName();
 const treasury = anchor.web3.Keypair.generate();
 const keychainName = randomName();
+const profileName = randomName();
 const adminPlayername = randomName();
 
 const renameCost = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
@@ -101,12 +105,24 @@ describe("keychain", () => {
         keychainProgram.programId
     );
 
+    const [profilePda, profilePdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
+        [
+            playerKeychainPda.toBuffer(),
+            Buffer.from(anchor.utils.bytes.utf8.encode(PROFILE)),
+        ],
+        profileProgram.programId
+    );
+
     console.log(`domain: ${domain}`);
     console.log(`domain pda: ${domainPda.toBase58()}`);
     console.log(`treasury: ${treasury.publicKey.toBase58()}`);
     console.log(`player keychain pda: ${playerKeychainPda.toBase58()}`);
     console.log(`admin player keychain pda: ${adminPlayerKeychainPda.toBase58()}`);
     console.log(`keychain program ID: ${keychainProgram.programId.toBase58()}`);
+
+    // we'll use these later
+    let nftMint: Keypair = null;
+    let nftAccount: PublicKey = null;
 
     it('sets up the test', async () => {
         // airdrop some sol to the random key's wallet + the 2nd key we're adding
@@ -118,6 +134,28 @@ describe("keychain", () => {
             await provider.connection.requestAirdrop(key2.publicKey, anchor.web3.LAMPORTS_PER_SOL * 0.5),
             "confirmed"
         );
+
+        // create a fake nft
+        nftMint = await createNFTMint(provider.connection, key2, key2.publicKey);
+        console.log('created nft mint: ', nftMint.publicKey.toBase58());
+        nftAccount = await createAssociatedTokenAccount(
+            provider.connection, // connection
+            key2, // fee payer
+            nftMint.publicKey, // mint
+            key2.publicKey // owner,
+        );
+        // mint the nft
+        let txhash = await mintToChecked(
+            provider.connection, // connection
+            key2, // fee payer
+            nftMint.publicKey, // mint
+            nftAccount, // receiver (sholud be a token account)
+            key2, // mint authority
+            1, // amount. if your decimals is 8, you mint 10^8 for 1 token.
+            0 // decimals
+        );
+        console.log('minted nft in tx: ', txhash);
+
     });
 
     it("Creates the domain and keychain", async () => {
@@ -156,7 +194,6 @@ describe("keychain", () => {
 
       let domainAcct = await keychainProgram.account.domain.fetch(domainPda);
         // if stored as byte array
-        let domainName  = new TextDecoder("utf-8").decode(new Uint8Array(domainAcct.name));
         // console.log('domain: ', domainAcct);
         console.log('domain: ', domainPda.toBase58());
         console.log('-- name: ', domainAcct.name);
@@ -211,6 +248,42 @@ describe("keychain", () => {
       }
   });
 
+  it("Creates the profile", async () => {
+
+    let txid;
+
+    // this won't work cause the user's key hasn't been added to the keychain
+    try {
+      txid = await profileProgram.methods.createProfile(profileName).accounts({
+        profile: profilePda,
+        keychain: playerKeychainPda,
+        user: provider.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+        keychainProgram: keychainProgram.programId
+      }).rpc();
+    } catch (err) {
+      // expected
+    }
+
+    // this does cause randomPlayerKeypair has been added as a key
+    txid = await profileProgram.methods.createProfile(profileName).accounts({
+        profile: profilePda,
+        keychain: playerKeychainPda,
+        user: randomPlayerKeypair.publicKey,
+        systemProgram: SystemProgram.programId,
+        keychainProgram: keychainProgram.programId
+    }).signers([randomPlayerKeypair]).rpc();
+
+    console.log(`created profile tx: ${txid}`);
+
+    let profileAcct = await profileProgram.account.profile.fetch(profilePda);
+    // console.log('domain: ', domainAcct);
+    console.log('profile: ', profilePda.toBase58());
+    console.log('-- username: ', profileAcct.username);
+    console.log('-- keychain: ', profileAcct.keychain.toBase58());
+
+  });
+
   it("Adds a key to the keychain and verifies it", async () => {
       let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
       console.log("treasury balance before adding key: ", treasuryBalance);
@@ -225,6 +298,21 @@ describe("keychain", () => {
           }
       });
       console.log(`added key ${key2.publicKey.toBase58()} to keychain: ${txid}`);
+
+      // try to set the pfp on the profile
+      try {
+        txid = await profileProgram.methods.setPfp().accounts({
+          pfpTokenAccount: nftAccount,
+          profile: profilePda,
+          keychain: playerKeychainPda,
+          user: key2.publicKey,
+          keychainProgram: keychainProgram.programId,
+        }).signers([key2]).rpc();
+        // shouldn't have worked
+        assert.fail();
+      } catch (err) {
+        // expected
+      }
 
       treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
       console.log("treasury balance after adding key (should still be 0, gets updated on the verify): ", treasuryBalance);
@@ -249,7 +337,7 @@ describe("keychain", () => {
               authority: randomPlayerKeypair.publicKey,
           }
       }).then(() => {
-          assert.fail("shoudln't be able to add same key again");
+          assert.fail("shouldn't be able to add same key again");
       }).catch(() => {
           // expected
       });
@@ -278,18 +366,35 @@ describe("keychain", () => {
       let key = await keychainProgram.account.keyChainKey.fetch(key2KeyPda);
       console.log(`created key account from verifying key: ${key2KeyPda}`);
 
-      /*
-      const key2Wallet = new Wallet(key2);
-      let ix = await program.methods.verifyKey().accounts({
-              keychain: playerKeychainPda,
-              authority: key2.publicKey,
-      }).instruction();
-      tx.add(ix);
-      tx.feePayer = provider.wallet.publicKey;
-      tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
-      tx = await key2Wallet.signTransaction(tx);
-      txid = await sendAndConfirmTransaction(provider.connection, tx, [key2]);
-       */
+      // now we should be able to set the pfp
+      txid = await profileProgram.methods.setPfp().accounts({
+        pfpTokenAccount: nftAccount,
+        profile: profilePda,
+        keychain: playerKeychainPda,
+        user: key2.publicKey,
+        keychainProgram: keychainProgram.programId,
+      }).signers([key2]).rpc();
+
+      let profileAcct = await profileProgram.account.profile.fetch(profilePda);
+      // console.log('domain: ', domainAcct);
+      console.log('profile: ', profilePda.toBase58());
+      console.log('-- username: ', profileAcct.username);
+      console.log('-- keychain: ', profileAcct.keychain.toBase58());
+      console.log('-- pfp token account: ', profileAcct.pfpTokenAccount.toBase58());
+
+
+    /*
+    const key2Wallet = new Wallet(key2);
+    let ix = await program.methods.verifyKey().accounts({
+            keychain: playerKeychainPda,
+            authority: key2.publicKey,
+    }).instruction();
+    tx.add(ix);
+    tx.feePayer = provider.wallet.publicKey;
+    tx.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
+    tx = await key2Wallet.signTransaction(tx);
+    txid = await sendAndConfirmTransaction(provider.connection, tx, [key2]);
+     */
       // txid = await provider.connection.sendRawTransaction(tx.serialize());
       console.log(`verified key2: ${txid}`);
 
