@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::TokenAccount;
+use keychain::account::KeyChainState;
 use keychain::program::Keychain;
-use keychain::KeyChain;
 
 declare_id!("5eTyYWF8YyvC7TKmj4iZATLw4gDBD6eP1jVp6sYwddD6");
 
@@ -73,7 +73,7 @@ pub struct CreateProfile<'info> {
     keychain_program: Program <'info, Keychain>,
 
     #[account(owner = keychain_program.key())]
-    keychain: Account<'info, KeyChain>,
+    keychain: Account<'info, KeyChainState>,
 }
 
 #[derive(Accounts)]
@@ -88,7 +88,7 @@ pub struct SetPfp<'info> {
     keychain_program: Program <'info, Keychain>,
 
     #[account(owner = keychain_program.key())]
-    keychain: Account<'info, KeyChain>,
+    keychain: Account<'info, KeyChainState>,
 
 }
 
@@ -120,9 +120,9 @@ pub enum ErrorCode {
 }
 
 // utility func to check if a particular key is on the given keychain and that it's verified
-pub fn check_key(keychain: &Account<KeyChain>, userkey: Pubkey) -> bool {
+pub fn check_key(keychain: &Account<KeyChainState>, userkey: Pubkey) -> bool {
     let mut found_key = false;
-    for key in &keychain.keys {
+    for key in &keychain.keychain.keys {
         if key.verified && key.key == userkey {
             found_key = true;
         }

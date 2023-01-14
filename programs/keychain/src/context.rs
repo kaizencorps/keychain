@@ -2,7 +2,13 @@
 
 use anchor_lang::prelude::*;
 use crate::account::*;
+use crate::program::Keychain;
 
+const KEYCHAIN: &str = "keychain";
+// the space for keychain pdas
+const KEYCHAIN_SPACE: &str = "keychains";
+// the space for keychain key pdas
+const KEY_SPACE: &str = "keys";
 
 #[derive(Accounts)]
 #[instruction(name: String)]
@@ -58,9 +64,9 @@ pub struct CreateKeychain<'info> {
     payer = authority,
     seeds = [keychanin_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
-    space = 8 + KeyChain::MAX_SIZE
+    space = 8 + KeyChainState::MAX_SIZE
     )]
-    pub keychain: Account<'info, KeyChain>,
+    pub keychain: Account<'info, KeyChainState>,
     #[account(
     init,
     payer = authority,
@@ -79,11 +85,21 @@ pub struct CreateKeychain<'info> {
     pub system_program: Program <'info, System>,
 }
 
+// for now let anyone call this method
+#[derive(Accounts)]
+pub struct UpgradeKeychain<'info> {
+
+    /// CHECK:
+    #[account(mut)]
+    pub keychain: AccountInfo<'info>,
+
+}
+
 #[derive(Accounts)]
 #[instruction(pubkey: Pubkey)]
 pub struct AddKey<'info> {
     #[account(mut)]
-    pub keychain: Account<'info, KeyChain>,
+    pub keychain: Account<'info, KeyChainState>,
 
     // -- this doesn't work cause anchor expects a passed in account to be initialized
     // this gets passed in but NOT initialized - just checked for existence
@@ -101,7 +117,7 @@ pub struct AddKey<'info> {
 #[derive(Accounts)]
 pub struct VerifyKey<'info> {
     #[account(mut)]
-    pub keychain: Account<'info, KeyChain>,
+    pub keychain: Account<'info, KeyChainState>,
 
     // the key account gets created here
     #[account(
@@ -131,7 +147,7 @@ pub struct VerifyKey<'info> {
 #[instruction(pubkey: Pubkey)]
 pub struct RemoveKey<'info> {
     #[account(mut)]
-    pub keychain: Account<'info, KeyChain>,
+    pub keychain: Account<'info, KeyChainState>,
 
     // the key account that will need to be removed
     // we close manually instead of using the close attribute since an unverified key won't have the corresponding account

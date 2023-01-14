@@ -170,7 +170,7 @@ describe("keychain", () => {
       // check doesn't exist yet
       let keychain = null;
       try {
-          await keychainProgram.account.keyChain.fetch(playerKeychainPda);
+          await keychainProgram.account.keyChainState.fetch(playerKeychainPda);
           assert.fail("keychain shouldn't exist");
       } catch (err) {
           // expected
@@ -217,8 +217,10 @@ describe("keychain", () => {
 
       console.log(`created 1st keychain tx: ${txid}`);
 
-      keychain = await keychainProgram.account.keyChain.fetch(playerKeychainPda);
+      let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainPda);
+      keychain = keychainState.keychain;
       console.log('keychain: ', keychain);
+      console.log('-- version: ', keychainState.version);
       console.log('-- name: ', keychain.name);
       console.log('-- domain: ', keychain.domain.toBase58());
       console.log('-- num keys: ', keychain.numKeys);
@@ -246,6 +248,14 @@ describe("keychain", () => {
       } catch (err) {
           // expected
       }
+  });
+
+  it("calls upgrade", async () => {
+
+    let txid = await randomPlayerProgram.methods.upgradeKeychain().accounts({
+      keychain: playerKeychainPda,
+    }).rpc();
+    console.log(`called upgrade tx: ${txid}`);
   });
 
   it("Creates the profile", async () => {
@@ -317,7 +327,8 @@ describe("keychain", () => {
       treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
       console.log("treasury balance after adding key (should still be 0, gets updated on the verify): ", treasuryBalance);
 
-      let keychain = await keychainProgram.account.keyChain.fetch(playerKeychainPda);
+      let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainPda);
+      let keychain = keychainState.keychain;
       try {
           let key = await keychainProgram.account.keyChainKey.fetch(key2KeyPda);
           assert.fail("key account shouldn't exist");
@@ -399,7 +410,8 @@ describe("keychain", () => {
       console.log(`verified key2: ${txid}`);
 
       // now the 2nd key is verified
-      keychain = await keychainProgram.account.keyChain.fetch(playerKeychainPda);
+      keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainPda);
+      keychain = keychainState.keychain;
 
       // verified!
       assert.ok(keychain.keys[1].verified, 'added key should be verified');
@@ -407,7 +419,8 @@ describe("keychain", () => {
   });
 
   it("removes a key from the keychain", async () => {
-      let keychain = await keychainProgram.account.keyChain.fetch(playerKeychainPda);
+      let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainPda);
+      let keychain = keychainState.keychain;
       console.log(`numkeys: ${keychain.numKeys}`);
       console.log(`keys length: ${keychain.keys.length}`);
       for (let x = 0; x < keychain.keys.length; x++) {
@@ -435,7 +448,8 @@ describe("keychain", () => {
           //expected
       }
 
-      keychain = await keychainProgram.account.keyChain.fetch(playerKeychainPda);
+      keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainPda);
+      keychain = keychainState.keychain;
       console.log(`after numkeys: ${keychain.numKeys}`);
       console.log(`after keys length: ${keychain.keys.length}`);
       for (let x = 0; x < keychain.keys.length; x++) {
@@ -474,7 +488,7 @@ describe("keychain", () => {
       });
 
       // keychain account shouldn't exist now
-      keychainProgram.account.keyChain.fetch(playerKeychainPda).then(() => {
+      keychainProgram.account.keyChainState.fetch(playerKeychainPda).then(() => {
           assert.fail("keychain account shouldn't exist");
       }).catch(() => {
           // expected

@@ -7,13 +7,6 @@ declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
 pub mod context;
 pub mod account;
 
-const KEYCHAIN: &str = "keychain";
-
-// the space for keychain pdas
-const KEYCHAIN_SPACE: &str = "keychains";
-// the space for keychain key pdas
-const KEY_SPACE: &str = "keys";
-
 // todo: use realloc to enable any number of keys instead of limiting to 5
 
 use context::*;
@@ -76,18 +69,20 @@ pub mod keychain {
             require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, ErrorCode::NotSigner);
         }
 
-        let keychain = &mut ctx.accounts.keychain;
+        let keychain_state = &mut ctx.accounts.keychain;
+
         let key = UserKey {
             key: *ctx.accounts.wallet.to_account_info().key,
             verified: true
         };
+        keychain_state.version = CURRENT_KEYCHAIN_VERSION;
 
-        // keychain.domain = ctx.accounts.domain.key();
-        // add to the keychain vector
-        keychain.name = keychain_name;
-        keychain.keys.push(key);
-        keychain.num_keys = 1;
-        keychain.domain = *ctx.accounts.domain.to_account_info().key;
+        keychain_state.keychain = CurrentKeyChain {
+            name: keychain_name,
+            num_keys: 1,
+            domain: *ctx.accounts.domain.to_account_info().key,
+            keys: vec![key],
+        };
 
         // first, verify the keychain_key derivation matches the given one (since they need to be unique)
         /*
@@ -111,9 +106,25 @@ pub mod keychain {
         Ok(())
     }
 
+    // upgrade an old account
+    pub fn upgrade_keychain(ctx: Context<UpgradeKeychain>) -> Result <()> {
+        let account_data = &mut &**ctx.accounts.keychain.try_borrow_mut_data()?;
+        // pull the 2nd byte to get the version
+        let version = account_data[1];
+        if version == 1 {
+            // deserialize the current keychain from the rest of the bytes
+            let current_keychain: CurrentKeyChain = CurrentKeyChain::try_from_slice(&account_data[2..])?;
+            msg!("got keychain account: {}", current_keychain.name);
+        } else {
+            msg!("unknown keychain version : {}", version);
+        }
+        Ok(())
+    }
+
     // user w/existing keychain (and verified key), adds a new (unverified) key
     pub fn add_key(ctx: Context<AddKey>, pubkey: Pubkey) -> Result <()> {
-        let keychain = &mut ctx.accounts.keychain;
+        let keychain_state = &mut ctx.accounts.keychain;
+        let keychain = &mut keychain_state.keychain;
 
         let mut found_signer = false;
         let mut found_existing = false;
@@ -131,7 +142,7 @@ pub mod keychain {
 
         require!(found_signer, ErrorCode::SignerNotInKeychain);
         require!(!found_existing, ErrorCode::KeyAlreadyExists);
-        require!(usize::from(keychain.num_keys) < KeyChain::MAX_KEYS, ErrorCode::MaxKeys);
+        require!(usize::from(keychain.num_keys) < KeyChainState::MAX_KEYS, ErrorCode::MaxKeys);
 
         // verify that the passed in key account is correct
         /*
@@ -167,7 +178,8 @@ pub mod keychain {
 
     // user verifies a new (unverified) key on a keychain (which then becomes verified)
     pub fn verify_key(ctx: Context<VerifyKey>) -> Result <()> {
-        let keychain = &mut ctx.accounts.keychain;
+        let keychain_state = &mut ctx.accounts.keychain;
+        let keychain = &mut keychain_state.keychain;
 
         let mut found_signer = false;
 
@@ -219,7 +231,8 @@ pub mod keychain {
 
     // remove a key from a keychain
     pub fn remove_key(ctx: Context<RemoveKey>, pubkey: Pubkey) -> Result <()> {
-        let keychain = &mut ctx.accounts.keychain;
+        let keychain_state = &mut ctx.accounts.keychain;
+        let keychain = &mut keychain_state.keychain;
 
         let mut found_signer = false;
         let mut remove_index = usize::MAX;
@@ -268,9 +281,9 @@ pub mod keychain {
 
         if keychain.num_keys == 0 {
             // close the keychain account if this is the last key
-            msg!("No more keys. Destroying keychain: {}", keychain.key());
+            msg!("No more keys. Destroying keychain: {}", keychain_state.key());
             // the keychain account lamports get sent to the authority that removed the last key
-            keychain.close(ctx.accounts.authority.to_account_info());
+            keychain_state.close(ctx.accounts.authority.to_account_info());
         }
 
         Ok(())
