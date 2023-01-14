@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
-
-pub const CURRENT_KEYCHAIN_VERSION: u8 = 1;
+use crate::constant::MAX_KEYS;
 
 // represents a user's wallet
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
@@ -15,9 +14,20 @@ pub struct CurrentKeyChain {
     pub name: String,
     pub num_keys: u16,
     pub domain: Pubkey,
+    pub bump: u8,
     // Attach a Vector of type ItemStruct to the account.
     pub keys: Vec<UserKey>,
 }
+
+/*
+#[account]
+pub struct OldKeyChain {
+    pub num_keys: u16,
+    pub domain: Pubkey,
+    // Attach a Vector of type ItemStruct to the account.
+    pub keys: Vec<UserKey>,
+}
+ */
 
 #[account]
 pub struct KeyChainState {
@@ -27,9 +37,7 @@ pub struct KeyChainState {
 }
 
 impl KeyChainState {
-    // allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
-    pub const MAX_KEYS: usize = 5;
-    pub const MAX_SIZE: usize = 1 + 32 + 2 + 32 + (4 + (KeyChainState::MAX_KEYS * 33));
+    pub const MAX_SIZE: usize = 1 + 32 + 2 + 32 + 1 + (4 + (MAX_KEYS * 33));
 }
 
 // a "pointer" account which points to the keychain it's attached to. prevent keys from being added ot multiple keychains
@@ -41,9 +49,8 @@ pub struct KeyChainKey {
     pub key: Pubkey,
 }
 
-// domains are needed for admin functions
-#[account]
-pub struct Domain {
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct CurrentDomain {
     // max size = 32
     pub name: String,
     pub authority: Pubkey,
@@ -52,8 +59,14 @@ pub struct Domain {
     pub bump: u8,
 }
 
-impl Domain {
+#[account]
+pub struct DomainState {
+    pub version: u8,
+    pub domain: CurrentDomain
+}
+
+impl DomainState {
     // 32 byte name
-    pub const MAX_SIZE: usize = 32 + 32 + 32 + 1 + 8;
+    pub const MAX_SIZE: usize = 1 + 32 + 32 + 32 + 1 + 8;
 }
 

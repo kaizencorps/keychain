@@ -3,12 +3,8 @@
 use anchor_lang::prelude::*;
 use crate::account::*;
 use crate::program::Keychain;
-
-const KEYCHAIN: &str = "keychain";
-// the space for keychain pdas
-const KEYCHAIN_SPACE: &str = "keychains";
-// the space for keychain key pdas
-const KEY_SPACE: &str = "keys";
+use crate::constant::*;
+use crate::error::*;
 
 #[derive(Accounts)]
 #[instruction(name: String)]
@@ -19,9 +15,9 @@ pub struct CreateDomain<'info> {
     payer = authority,
     seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
-    space = 8 + Domain::MAX_SIZE,
+    space = 8 + DomainState::MAX_SIZE,
     )]
-    pub domain: Account<'info, Domain>,
+    pub domain: Account<'info, DomainState>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program <'info, System>,
@@ -62,7 +58,7 @@ pub struct CreateKeychain<'info> {
     #[account(
     init,
     payer = authority,
-    seeds = [keychanin_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [keychanin_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     space = 8 + KeyChainState::MAX_SIZE
     )]
@@ -70,14 +66,14 @@ pub struct CreateKeychain<'info> {
     #[account(
     init,
     payer = authority,
-    seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     space = 8 + (32 * 2)
     )]
     // the first key on this keychain
     pub key: Account<'info, KeyChainKey>,
     #[account()]
-    pub domain: Account<'info, Domain>,
+    pub domain: Account<'info, DomainState>,
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub wallet: AccountInfo<'info>,
     #[account(mut)]
@@ -87,13 +83,33 @@ pub struct CreateKeychain<'info> {
 
 // for now let anyone call this method
 #[derive(Accounts)]
-pub struct UpgradeKeychain<'info> {
+pub struct UpgradeKeyChain<'info> {
 
     /// CHECK:
     #[account(mut)]
     pub keychain: AccountInfo<'info>,
 
 }
+
+/*
+#[derive(Accounts)]
+pub struct UpgradeOldKeyChain<'info> {
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    // reallocate size to include room for the name + state info (verison)
+    /// CHECK:
+    #[account(
+    mut,
+    realloc = 1 + 32 + 2 + 32 + (4 + (MAX_KEYS * 33)),
+    realloc::payer = user,
+    realloc::zero = true
+    )]
+    pub keychain: Account<'info, OldKeyChain>,
+    pub system_program: Program <'info, System>,
+}
+ */
 
 #[derive(Accounts)]
 #[instruction(pubkey: Pubkey)]
@@ -107,7 +123,7 @@ pub struct AddKey<'info> {
 
     /// CHECK: just reading
     #[account()]
-    pub domain: Account<'info, Domain>,
+    pub domain: Account<'info, DomainState>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
@@ -123,7 +139,7 @@ pub struct VerifyKey<'info> {
     #[account(
     init,
     payer = authority,
-    seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     space = 8 + (32 * 2)
     )]
@@ -133,11 +149,11 @@ pub struct VerifyKey<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    #[account(has_one = treasury)]
-    pub domain: Account<'info, Domain>,
+    #[account(constraint = domain.domain.treasury == treasury.key() @ KeychainError::WrongTreasury)]
+    pub domain: Account<'info, DomainState>,
 
-    /// CHECK: not sure why the address or constraint check doesn't work (see the remove key)
-    #[account(mut, address = domain.treasury)]
+    /// CHECK: gets checked by domain constraint
+    #[account(mut, address = domain.domain.treasury)]
     pub treasury: AccountInfo<'info>,
 
     pub system_program: Program <'info, System>,
@@ -152,21 +168,21 @@ pub struct RemoveKey<'info> {
     // the key account that will need to be removed
     // we close manually instead of using the close attribute since an unverified key won't have the corresponding account
     #[account(
-    seeds = [pubkey.as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [pubkey.as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     mut,
     )]
     pub key: Account<'info, KeyChainKey>,
 
-    #[account(has_one = treasury)]
-    pub domain: Account<'info, Domain>,
+    // #[account(has_one = treasury)]
+    #[account(constraint = domain.domain.treasury == treasury.key() @ KeychainError::WrongTreasury)]
+    pub domain: Account<'info, DomainState>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    // #[account(mut, constraint = *treasury.key == domain.treasury)]
-    /// CHECK: not sure why the address or constraint check doesn't work, but regardless we're checking on the domain w/has_one
-    #[account(mut, address = domain.treasury)]
+    /// CHECK: gets checked by domain constraint
+    #[account(mut, address = domain.domain.treasury)]
     pub treasury: AccountInfo<'info>
 }

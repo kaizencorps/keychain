@@ -161,7 +161,7 @@ describe("keychain", () => {
     it("Creates the domain and keychain", async () => {
 
       try {
-        await keychainProgram.account.domain.fetch(domainPda);
+        await keychainProgram.account.domainState.fetch(domainPda);
         assert.fail("domain account shouldn't exist");
       } catch (err) {
         // expected
@@ -182,17 +182,16 @@ describe("keychain", () => {
 
       let txid;
 
-      txid = await keychainProgram.rpc.createDomain(domain, renameCost, {
-          accounts: {
-              domain: domainPda,
-              authority: provider.wallet.publicKey,
-              systemProgram: SystemProgram.programId,
-              treasury: treasury.publicKey
-          }
-      });
+      txid = await keychainProgram.methods.createDomain(domain, renameCost).accounts({
+            domain: domainPda,
+            authority: provider.wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+            treasury: treasury.publicKey
+      }).rpc();
       console.log(`created domain tx: ${txid}`);
 
-      let domainAcct = await keychainProgram.account.domain.fetch(domainPda);
+      let domainStateAcct = await keychainProgram.account.domainState.fetch(domainPda);
+      let domainAcct = domainStateAcct.domain;
         // if stored as byte array
         // console.log('domain: ', domainAcct);
         console.log('domain: ', domainPda.toBase58());
@@ -340,19 +339,17 @@ describe("keychain", () => {
       assert.ok(!keychain.keys[1].verified, 'added key should be verified');
 
       // try to add again and we fail (already there)
-      randomPlayerProgram.rpc.addKey(key2.publicKey, {
-          accounts: {
-              domain: domainPda,
-              keychain: playerKeychainPda,
-              // key: key2KeyPda,
-              authority: randomPlayerKeypair.publicKey,
-          }
-      }).then(() => {
-          assert.fail("shouldn't be able to add same key again");
-      }).catch(() => {
-          // expected
-      });
-
+      try {
+        await randomPlayerProgram.methods.addKey(key2.publicKey).accounts({
+          domain: domainPda,
+          keychain: playerKeychainPda,
+          // key: key2KeyPda,
+          authority: randomPlayerKeypair.publicKey,
+        }).rpc();
+        assert.fail("shouldn't be able to add same key again");
+      } catch (err) {
+        // expected
+      }
       // now the key2 account needs to verify
       let tx = new Transaction();
 
@@ -364,6 +361,7 @@ describe("keychain", () => {
           new Wallet(key2),
           {}
       );
+
       const program2 = new Program(keychainProgram.idl, keychainProgram.programId, provider2);
       txid = await program2.methods.verifyKey().accounts({
           keychain: playerKeychainPda,

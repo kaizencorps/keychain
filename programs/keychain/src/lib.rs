@@ -4,11 +4,15 @@ use crate::program::Keychain;
 declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
 // declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
+pub mod constant;
+pub mod error;
 pub mod context;
 pub mod account;
 
 // todo: use realloc to enable any number of keys instead of limiting to 5
 
+use constant::*;
+use error::*;
 use context::*;
 use account::*;
 
@@ -24,15 +28,19 @@ pub mod keychain {
     use anchor_lang::solana_program::program::invoke_signed;
 
     pub fn create_domain(ctx: Context<CreateDomain>, name: String, keychain_cost: u64) -> Result <()> {
-        ctx.accounts.domain.authority = *ctx.accounts.authority.key;
-        ctx.accounts.domain.bump = *ctx.bumps.get("domain").unwrap();
 
         // check name length <= 32
-        require!(name.as_bytes().len() <= 32, ErrorCode::NameTooLong);
+        require!(name.as_bytes().len() <= 32, KeychainError::NameTooLong);
 
-        ctx.accounts.domain.name = name;
-        ctx.accounts.domain.treasury = ctx.accounts.treasury.key();
-        ctx.accounts.domain.keychain_cost = keychain_cost;
+        let domain_state = &mut ctx.accounts.domain;
+        domain_state.version = CURRENT_DOMAIN_VERSION;
+        domain_state.domain = CurrentDomain {
+            name: name,
+            authority: ctx.accounts.authority.key(),
+            keychain_cost: keychain_cost,
+            treasury: ctx.accounts.treasury.key(),
+            bump: *ctx.bumps.get("domain").unwrap(),
+        };
 
         msg!("created domain account: {}", ctx.accounts.domain.key());
         Ok(())
@@ -58,15 +66,15 @@ pub mod keychain {
 
     // if done by admin, then the authority needs to be the Domain's authority
     pub fn create_keychain(ctx: Context<CreateKeychain>, keychain_name: String) -> Result <()> {
-        require!(keychain_name.as_bytes().len() <= 32, ErrorCode::NameTooLong);
+        require!(keychain_name.as_bytes().len() <= 32, KeychainError::NameTooLong);
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
+        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
             admin = true;
         } else {
             // otherwise, the wallet being added needs to be the signer
-            require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, ErrorCode::NotSigner);
+            require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, KeychainError::NotSigner);
         }
 
         let keychain_state = &mut ctx.accounts.keychain;
@@ -81,6 +89,7 @@ pub mod keychain {
             name: keychain_name,
             num_keys: 1,
             domain: *ctx.accounts.domain.to_account_info().key,
+            bump: *ctx.bumps.get("keychain").unwrap(),
             keys: vec![key],
         };
 
@@ -91,7 +100,7 @@ pub mod keychain {
 
         if ctx.accounts.keychain_key.key() != keychain_key_address {
             msg!("derived keychain key account (pointer) doesn't match: {}", keychain_key_address);
-            return Err(ErrorCode::IncorrectKeyAddress.into());
+            return Err(KeychainError::IncorrectKeyAddress.into());
         }
          */
 
@@ -106,8 +115,8 @@ pub mod keychain {
         Ok(())
     }
 
-    // upgrade an old account
-    pub fn upgrade_keychain(ctx: Context<UpgradeKeychain>) -> Result <()> {
+    // upgrade an old account - doesn't do anything yet
+    pub fn upgrade_keychain(ctx: Context<UpgradeKeyChain>) -> Result <()> {
         let account_data = &mut &**ctx.accounts.keychain.try_borrow_mut_data()?;
         // pull the 2nd byte to get the version
         let version = account_data[1];
@@ -130,25 +139,36 @@ pub mod keychain {
         let mut found_existing = false;
         let signer = *ctx.accounts.authority.to_account_info().key;
 
-        // check that the signer is in the keychain & whether this key already exists
-        for user_key in &keychain.keys {
-            if user_key.verified && user_key.key == signer {
-                found_signer = true;
-            }
-            if pubkey == user_key.key {
-                found_existing = true;
-            }
+        // see if this is an admin
+        let mut admin = false;
+
+        // if the signer is the same as the domain authority, then this is a domain admin
+        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
+            admin = true;
         }
 
-        require!(found_signer, ErrorCode::SignerNotInKeychain);
-        require!(!found_existing, ErrorCode::KeyAlreadyExists);
-        require!(usize::from(keychain.num_keys) < KeyChainState::MAX_KEYS, ErrorCode::MaxKeys);
+        // admins can add keys willy nilly
+        if !admin {
+            // check that the signer is in the keychain & whether this key already exists
+            for user_key in &keychain.keys {
+                if user_key.verified && user_key.key == signer {
+                    found_signer = true;
+                }
+                if pubkey == user_key.key {
+                    found_existing = true;
+                }
+            }
+            require!(found_signer, KeychainError::SignerNotInKeychain);
+            require!(!found_existing, KeychainError::KeyAlreadyExists);
+        }
+
+        require!(usize::from(keychain.num_keys) < MAX_KEYS, KeychainError::MaxKeys);
 
         // verify that the passed in key account is correct
         /*
         let (keychain_key_address, _keychain_key_bump) =
             Pubkey::find_program_address(&[pubkey.as_ref(), ctx.accounts.domain.name.as_bytes(), KEYCHAIN.as_bytes()], ctx.program_id);
-        require!(keychain_key_address == pubkey, ErrorCode::IncorrectKeyAddress);
+        require!(keychain_key_address == pubkey, KeychainError::IncorrectKeyAddress);
          */
 
         // todo: figure out how to check that the key pda does NOT exist yet
@@ -158,7 +178,7 @@ pub mod keychain {
         /*
         if **ctx.accounts.key.to_account_info().try_borrow_lamports()? > 0 {
             msg!("A Key account already exists: {}", pubkey);
-            return Err(ErrorCode::KeyAlreadyExists.into());
+            return Err(KeychainError::KeyAlreadyExists.into());
         }
          */
 
@@ -181,36 +201,41 @@ pub mod keychain {
         let keychain_state = &mut ctx.accounts.keychain;
         let keychain = &mut keychain_state.keychain;
 
-        let mut found_signer = false;
-
         let signer = *ctx.accounts.authority.to_account_info().key;
 
-        for user_key in &mut *keychain.keys {
-            if user_key.key == signer {
-                found_signer = true;
-                if user_key.verified {
-                    msg!("key already verified: {}", user_key.key);
-                } else {
-                    msg!("key now verified: {}", user_key.key);
-                    user_key.verified = true;
-                }
-            }
+        let mut admin = false;
+        // if the signer is the same as the domain authority, then this is a domain admin
+        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
+            admin = true;
         }
 
-        require!(found_signer, ErrorCode::SignerNotInKeychain);
+        if !admin {
+            let mut found_signer = false;
+            for user_key in &mut *keychain.keys {
+                if user_key.key == signer {
+                    found_signer = true;
+                    if user_key.verified {
+                        msg!("key already verified: {}", user_key.key);
+                    } else {
+                        msg!("key now verified: {}", user_key.key);
+                        user_key.verified = true;
+                    }
+                }
+            }
+            require!(found_signer, KeychainError::SignerNotInKeychain);
+        }
 
-        let domain = &ctx.accounts.domain;
+        let domain = &ctx.accounts.domain.domain;
 
         // check that the payer can pay for this
         if ctx.accounts.authority.lamports() < domain.keychain_cost {
-            return Err(ErrorCode::NotEnoughSol.into());
+            return Err(KeychainError::NotEnoughSol.into());
         }
 
         // now set up the pointer/map account
         let keychain_key = &mut ctx.accounts.key;
         keychain_key.key = signer;
         keychain_key.keychain = ctx.accounts.keychain.key();
-
 
         // pay for this key - transfer sol to treasury
         invoke(
@@ -254,15 +279,15 @@ pub mod keychain {
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
+        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
             admin = true;
         }
 
-        require!(remove_index != usize::MAX, ErrorCode::KeyNotFound);
+        require!(remove_index != usize::MAX, KeychainError::KeyNotFound);
 
         // admins can remove keys
         if !admin {
-            require!(found_signer, ErrorCode::SignerNotInKeychain);
+            require!(found_signer, KeychainError::SignerNotInKeychain);
         }
 
         let removed_key = keychain.keys.swap_remove(remove_index);
@@ -291,29 +316,6 @@ pub mod keychain {
 }
 
 
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("You don't have enough SOL")]
-    NotEnoughSol,
-    #[msg("The given key account is not the correct PDA for the given address")]
-    IncorrectKeyAddress,
-    #[msg("That key already exists")]
-    KeyAlreadyExists,
-    #[msg("You cannot add any more keys on your keychain. Remove one first")]
-    MaxKeys,
-    #[msg("You are not a valid signer for this keychain")]
-    SignerNotInKeychain,
-    #[msg("That key doesn't exist on this keychain")]
-    KeyNotFound,
-    #[msg("Signer is not a domain admin")]
-    NotDomainAdmin,
-    #[msg("Can only add wallet of signer")]
-    NotSigner,
-    #[msg("Name too long. Max 32 characters")]
-    NameTooLong,
-
-}
 
 
 
