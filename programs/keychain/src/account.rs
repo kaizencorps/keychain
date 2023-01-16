@@ -9,7 +9,8 @@ pub struct UserKey {
     pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
 }
 
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+// the current version of the keychain
+#[account]
 pub struct CurrentKeyChain {
     pub name: String,
     pub num_keys: u16,
@@ -19,28 +20,23 @@ pub struct CurrentKeyChain {
     pub keys: Vec<UserKey>,
 }
 
-/*
+impl CurrentKeyChain {
+    pub const MAX_SIZE: usize = 32 + 2 + 32 + 1 + (4 + (MAX_KEYS * 33));
+}
+
+// older versions
 #[account]
-pub struct OldKeyChain {
+pub struct KeyChainV1 {
     pub num_keys: u16,
     pub domain: Pubkey,
-    // Attach a Vector of type ItemStruct to the account.
     pub keys: Vec<UserKey>,
 }
- */
 
-#[account]
-pub struct KeyChainState {
-    // name for the keychain. can be used as a username
-    pub version: u8,
-    pub keychain: CurrentKeyChain
+impl KeyChainV1 {
+    pub const MAX_SIZE: usize = 2 + 32 + (4 + (MAX_KEYS * 33));
 }
 
-impl KeyChainState {
-    pub const MAX_SIZE: usize = 1 + 32 + 2 + 32 + 1 + (4 + (MAX_KEYS * 33));
-}
-
-// a "pointer" account which points to the keychain it's attached to. prevent keys from being added ot multiple keychains
+// a "pointer" account which points to the keychain it's attached to. prevents keys from being added ot multiple keychains within a domain
 #[account]
 pub struct KeyChainKey {
     // pointer to the keychain this key is attached to
@@ -49,7 +45,11 @@ pub struct KeyChainKey {
     pub key: Pubkey,
 }
 
-#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+impl KeyChainKey {
+    pub const MAX_SIZE: usize = 32 + 32;
+}
+
+#[account]
 pub struct CurrentDomain {
     // max size = 32
     pub name: String,
@@ -59,14 +59,32 @@ pub struct CurrentDomain {
     pub bump: u8,
 }
 
+impl CurrentDomain {
+    pub const MAX_SIZE: usize = 32 + 32 + 32 + 8 + 1;
+}
+
+// these accounts are for versioning - they shouldn't change
+
+#[account]
+pub struct KeyChainState {
+    pub keychain_version: u8,
+    pub key_version: u8,
+    // the keychain this account is for
+    pub keychain: Pubkey
+}
+
+impl KeyChainState {
+    pub const MAX_SIZE: usize = 1 + 1 + 32;
+}
+
 #[account]
 pub struct DomainState {
     pub version: u8,
-    pub domain: CurrentDomain
+    // the domain this state is for
+    pub domain: Pubkey
 }
 
 impl DomainState {
     // 32 byte name
-    pub const MAX_SIZE: usize = 1 + 32 + 32 + 32 + 1 + 8;
+    pub const MAX_SIZE: usize = 1 + 32;
 }
-

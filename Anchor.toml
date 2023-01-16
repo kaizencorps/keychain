@@ -3,13 +3,16 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+#keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+keychain = "6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T"
 
 [programs.devnet]
-keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+#keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
 
 [programs.mainnet]
-keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+#keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
 
 [registry]
 url = "https://api.apr.dev"

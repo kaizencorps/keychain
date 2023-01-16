@@ -1,8 +1,12 @@
 use anchor_lang::prelude::*;
 use crate::program::Keychain;
 
-declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
-// declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
+// keychain v1
+// declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
+// keychain v2
+// declare_id!("Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo");
+
+declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
 pub mod constant;
 pub mod error;
@@ -18,6 +22,8 @@ use account::*;
 
 #[program]
 pub mod keychain {
+    use std::borrow::BorrowMut;
+    use std::ops::Deref;
     use anchor_lang::{AccountsClose, system_program};
     use super::*;
 
@@ -32,15 +38,16 @@ pub mod keychain {
         // check name length <= 32
         require!(name.as_bytes().len() <= 32, KeychainError::NameTooLong);
 
-        let domain_state = &mut ctx.accounts.domain;
+        let domain_state = &mut ctx.accounts.domain_state;
         domain_state.version = CURRENT_DOMAIN_VERSION;
-        domain_state.domain = CurrentDomain {
-            name: name,
-            authority: ctx.accounts.authority.key(),
-            keychain_cost: keychain_cost,
-            treasury: ctx.accounts.treasury.key(),
-            bump: *ctx.bumps.get("domain").unwrap(),
-        };
+        domain_state.domain = ctx.accounts.domain.key();
+
+        let domain = &mut ctx.accounts.domain;
+        domain.name = name;
+        domain.authority = *ctx.accounts.authority.key;
+        domain.keychain_cost = keychain_cost;
+        domain.treasury = *ctx.accounts.treasury.key;
+        domain.bump = *ctx.bumps.get("domain").unwrap();
 
         msg!("created domain account: {}", ctx.accounts.domain.key());
         Ok(())
@@ -70,39 +77,30 @@ pub mod keychain {
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
+        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
         } else {
             // otherwise, the wallet being added needs to be the signer
             require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, KeychainError::NotSigner);
         }
 
-        let keychain_state = &mut ctx.accounts.keychain;
+        let keychain_state = &mut ctx.accounts.keychain_state;
+
+        keychain_state.key_version = CURRENT_KEYCHAIN_VERSION;
+        keychain_state.keychain = ctx.accounts.keychain.key();
+
 
         let key = UserKey {
             key: *ctx.accounts.wallet.to_account_info().key,
             verified: true
         };
-        keychain_state.version = CURRENT_KEYCHAIN_VERSION;
 
-        keychain_state.keychain = CurrentKeyChain {
-            name: keychain_name,
-            num_keys: 1,
-            domain: *ctx.accounts.domain.to_account_info().key,
-            bump: *ctx.bumps.get("keychain").unwrap(),
-            keys: vec![key],
-        };
-
-        // first, verify the keychain_key derivation matches the given one (since they need to be unique)
-        /*
-        let (keychain_key_address, _keychain_key_bump) =
-            Pubkey::find_program_address(&[ctx.accounts.keychain_key.key().as_ref(), ctx.accounts.domain.name.as_bytes(), KEYCHAIN.as_bytes()], ctx.program_id);
-
-        if ctx.accounts.keychain_key.key() != keychain_key_address {
-            msg!("derived keychain key account (pointer) doesn't match: {}", keychain_key_address);
-            return Err(KeychainError::IncorrectKeyAddress.into());
-        }
-         */
+        let keychain = &mut ctx.accounts.keychain;
+        keychain.name = keychain_name;
+        keychain.num_keys = 1;
+        keychain.domain = ctx.accounts.domain.key();
+        keychain.bump = *ctx.bumps.get("keychain").unwrap();
+        keychain.keys = vec![key];
 
         // now set up the pointer/map account
         let keychain_key = &mut ctx.accounts.key;
@@ -115,25 +113,128 @@ pub mod keychain {
         Ok(())
     }
 
-    // upgrade an old account - doesn't do anything yet
+    // for testing upgrade mechanism
+    pub fn create_keychain_v1(ctx: Context<CreateKeychainV1>, keychain_name: String) -> Result <()> {
+        require!(keychain_name.as_bytes().len() <= 32, KeychainError::NameTooLong);
+        let mut admin = false;
+
+        let keychain_state = &mut ctx.accounts.keychain_state;
+
+        // set to older version
+        keychain_state.keychain_version = CURRENT_KEYCHAIN_VERSION - 1;
+        keychain_state.key_version = CURRENT_KEYCHAIN_VERSION - 1;
+        keychain_state.keychain = ctx.accounts.keychain.key();
+
+        let key = UserKey {
+            key: *ctx.accounts.wallet.to_account_info().key,
+            verified: true
+        };
+
+        let keychain = &mut ctx.accounts.keychain;
+        keychain.num_keys = 1;
+        keychain.domain = *ctx.accounts.domain.to_account_info().key;
+        keychain.keys = vec![key];
+
+        // now set up the pointer/map account
+        let keychain_key = &mut ctx.accounts.key;
+        keychain_key.key = ctx.accounts.wallet.key();
+        keychain_key.keychain = ctx.accounts.keychain.key();
+
+        msg!("created keychain account: {}", ctx.accounts.keychain.key());
+        msg!("created key account: {}", ctx.accounts.key.key());
+        Ok(())
+    }
+
+    // versioning example: upgrade an old account using the keychainstate t
     pub fn upgrade_keychain(ctx: Context<UpgradeKeyChain>) -> Result <()> {
-        let account_data = &mut &**ctx.accounts.keychain.try_borrow_mut_data()?;
-        // pull the 2nd byte to get the version
-        let version = account_data[1];
-        if version == 1 {
-            // deserialize the current keychain from the rest of the bytes
-            let current_keychain: CurrentKeyChain = CurrentKeyChain::try_from_slice(&account_data[2..])?;
-            msg!("got keychain account: {}", current_keychain.name);
+
+        // get the current keychain version
+        let keychain_state = &mut ctx.accounts.keychain_state;
+        if keychain_state.keychain_version == CURRENT_KEYCHAIN_VERSION {
+            msg!("keychain is already up to date");
+            return Ok(());
         } else {
-            msg!("unknown keychain version : {}", version);
+            if keychain_state.keychain_version == CURRENT_KEYCHAIN_VERSION - 1 {
+                msg!("upgrading keychain from version 1 to version 2");
+
+                let account_data_len = ctx.accounts.keychain.try_data_len()?;
+                // first let's increase the account size by 33 bytes (32 for the name + 1 for the bump)
+                let rent = Rent::get()?;
+                let new_size = account_data_len + 1 + 32;
+
+                msg!("old account size: {}, new account size: {}, rent: {}", account_data_len, new_size, rent.lamports_per_byte_year);
+
+                let new_min_balance = rent.minimum_balance(new_size);
+                let lamport_diff = new_min_balance.saturating_sub(ctx.accounts.keychain.lamports());
+
+                msg!("new min balance: {}, lamport diff: {}", new_min_balance, lamport_diff);
+
+                // transfer in some lamports to make up the difference in rent
+                invoke(
+                    &system_instruction::transfer(
+                        ctx.accounts.user.key,
+                        ctx.accounts.keychain.key,
+                        lamport_diff,
+                    ),
+                    &[
+                        ctx.accounts.user.to_account_info().clone(),
+                        ctx.accounts.keychain.clone(),
+                        ctx.accounts.system_program.to_account_info().clone(),
+                    ],
+                )?;
+
+                // now create our new data - first reallocate
+
+                // realloc - leave account data (assumes we'll grow the account)
+                ctx.accounts.keychain.realloc(new_size, false)?;
+
+                msg!("reallocated account");
+
+                // first deserialize the old keychain account
+                // let mut account_data = ctx.accounts.keychain.try_borrow_mut_data()?;
+
+                let mut data = ctx.accounts.keychain.try_borrow_mut_data()?;
+                let dst: &mut &[u8] = &mut &***&mut data;
+
+                // let account_data = &mut &**ctx.accounts.keychain.try_borrow_data()?;
+                let v1_keychain: KeyChainV1 = KeyChainV1::try_deserialize(dst)?;
+
+                msg!("deserialized old account data");
+
+                // fake data
+                const bump: u8 = 33;
+                let name: String = "test".to_string();
+
+                // now we create a new one
+                let new_keychain = CurrentKeyChain {
+                    name,
+                    num_keys: v1_keychain.num_keys,
+                    domain: v1_keychain.domain,
+                    bump,
+                    keys: v1_keychain.keys,
+                };
+
+                // bump the version
+                keychain_state.keychain_version = CURRENT_KEYCHAIN_VERSION;
+
+                let ddst: &mut [u8] = &mut data;
+                let mut cursor = std::io::Cursor::new(ddst);
+                new_keychain.try_serialize(&mut cursor)?;
+
+                msg!("migrated keychain to version: {}", CURRENT_KEYCHAIN_VERSION);
+
+            } else {
+                msg!("keychain version is not supported: {}", keychain_state.keychain_version);
+                return Err(KeychainError::InvalidKeychainVersion.into());
+            }
         }
+
         Ok(())
     }
 
     // user w/existing keychain (and verified key), adds a new (unverified) key
     pub fn add_key(ctx: Context<AddKey>, pubkey: Pubkey) -> Result <()> {
-        let keychain_state = &mut ctx.accounts.keychain;
-        let keychain = &mut keychain_state.keychain;
+        let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
         let mut found_existing = false;
@@ -143,7 +244,7 @@ pub mod keychain {
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
+        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
         }
 
@@ -198,14 +299,13 @@ pub mod keychain {
 
     // user verifies a new (unverified) key on a keychain (which then becomes verified)
     pub fn verify_key(ctx: Context<VerifyKey>) -> Result <()> {
-        let keychain_state = &mut ctx.accounts.keychain;
-        let keychain = &mut keychain_state.keychain;
+        let keychain = &mut ctx.accounts.keychain;
 
         let signer = *ctx.accounts.authority.to_account_info().key;
 
         let mut admin = false;
         // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
+        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
         }
 
@@ -225,7 +325,7 @@ pub mod keychain {
             require!(found_signer, KeychainError::SignerNotInKeychain);
         }
 
-        let domain = &ctx.accounts.domain.domain;
+        let domain = &ctx.accounts.domain;
 
         // check that the payer can pay for this
         if ctx.accounts.authority.lamports() < domain.keychain_cost {
@@ -256,8 +356,7 @@ pub mod keychain {
 
     // remove a key from a keychain
     pub fn remove_key(ctx: Context<RemoveKey>, pubkey: Pubkey) -> Result <()> {
-        let keychain_state = &mut ctx.accounts.keychain;
-        let keychain = &mut keychain_state.keychain;
+        let keychain = &mut ctx.accounts.keychain;
 
         let mut found_signer = false;
         let mut remove_index = usize::MAX;
@@ -279,7 +378,7 @@ pub mod keychain {
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.domain.authority.key() {
+        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
         }
 
@@ -301,14 +400,16 @@ pub mod keychain {
             msg!("Closing key account: {}", ctx.accounts.key.key());
             let keychain_key = &mut ctx.accounts.key;
             // send the lamports for closing to the domain treasury
-            keychain_key.close(ctx.accounts.treasury.to_account_info());
+            keychain_key.close(ctx.accounts.treasury.to_account_info())?;
         }
 
         if keychain.num_keys == 0 {
             // close the keychain account if this is the last key
-            msg!("No more keys. Destroying keychain: {}", keychain_state.key());
-            // the keychain account lamports get sent to the authority that removed the last key
-            keychain_state.close(ctx.accounts.authority.to_account_info());
+            msg!("No more keys. Destroying keychain: {}", keychain.key());
+
+            // the keychain and associated state account lamports get sent to the authority that removed the last key
+            keychain.close(ctx.accounts.authority.to_account_info())?;
+            ctx.accounts.keychain_state.close(ctx.accounts.authority.to_account_info())?;
         }
 
         Ok(())

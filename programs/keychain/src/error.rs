@@ -22,5 +22,7 @@ pub enum KeychainError {
     NameTooLong,
     #[msg("Wrong treasury account")]
     WrongTreasury,
+    #[msg("Wrong keychain version")]
+    InvalidKeychainVersion
 
 }

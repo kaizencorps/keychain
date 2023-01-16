@@ -6,7 +6,21 @@ import {
   MINT_SIZE,
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
+import {Program} from "@project-serum/anchor";
+import { Keychain } from "../target/types/keychain";
+import { Profile } from "../target/types/profile";
 
+export const DOMAIN = 'domination';
+export const KEYCHAIN = 'keychain';
+
+export const DOMAIN_STATE = 'domain_state';
+
+export const KEYCHAIN_SPACE = 'keychains';
+export const KEYCHAIN_STATE_SPACE = 'keychain_states';
+export const KEY_SPACE = 'keys';
+
+const keychainProgram = anchor.workspace.Keychain as Program<Keychain>;
+const profileProgram = anchor.workspace.Profile as Program<Profile>;
 
 export async function createNFTMint(connection: Connection, payer: Keypair, authority: PublicKey): Promise<Keypair> {
 
@@ -27,3 +41,60 @@ export async function createNFTMint(connection: Connection, payer: Keypair, auth
   await sendAndConfirmTransaction(connection, transaction, [payer, mintKey]);
   return mintKey;
 }
+
+export const findDomainPda = (domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN))],
+      keychainprogid
+  );
+}
+
+export const findDomainStatePda = (domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+          Buffer.from(anchor.utils.bytes.utf8.encode(DOMAIN_STATE)),
+          Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+          Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN))],
+      keychainprogid
+  );
+}
+
+// finds the keychain pda for the given playername (for the domination domain)
+export const findKeychainPda = (name: string, domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode(name)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN_SPACE)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
+      ],
+      keychainprogid,
+  );
+};
+
+export const findKeychainStatePda = (keychainPda: PublicKey, domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        keychainPda.toBuffer(),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN_STATE_SPACE)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
+      ],
+      keychainprogid,
+  );
+};
+
+// find the keychain KEY pda for the given wallet address (for the domination domain)
+export const findKeychainKeyPda = (walletAddress: PublicKey, domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
+  // const [keychainPda, keychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        walletAddress.toBuffer(),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEY_SPACE)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
+      ],
+      keychainprogid,
+  );
+};
