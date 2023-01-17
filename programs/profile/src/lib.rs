@@ -3,7 +3,7 @@ use anchor_spl::token::TokenAccount;
 use keychain::account::{CurrentKeyChain, KeyChainState};
 use keychain::program::Keychain;
 
-declare_id!("5eTyYWF8YyvC7TKmj4iZATLw4gDBD6eP1jVp6sYwddD6");
+declare_id!("ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt");
 
 const PROFILE: &str = "profile";
 

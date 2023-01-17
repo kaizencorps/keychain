@@ -19,6 +19,8 @@ export const KEYCHAIN_SPACE = 'keychains';
 export const KEYCHAIN_STATE_SPACE = 'keychain_states';
 export const KEY_SPACE = 'keys';
 
+export const PROFILE = 'profile';
+
 const keychainProgram = anchor.workspace.Keychain as Program<Keychain>;
 const profileProgram = anchor.workspace.Profile as Program<Profile>;
 
@@ -98,3 +100,14 @@ export const findKeychainKeyPda = (walletAddress: PublicKey, domain: string, key
       keychainprogid,
   );
 };
+
+export const findProfilePda = (keychainPda: PublicKey, profileprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        keychainPda.toBuffer(),
+        Buffer.from(anchor.utils.bytes.utf8.encode(PROFILE)),
+      ],
+      profileprogid
+  );
+
+}

@@ -3,10 +3,11 @@ use crate::program::Keychain;
 
 // keychain v1
 // declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
-// keychain v2
-// declare_id!("Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo");
 
-declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
+// keychain v2
+declare_id!("Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo");
+
+// declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
 pub mod constant;
 pub mod error;
@@ -116,7 +117,6 @@ pub mod keychain {
     // for testing upgrade mechanism
     pub fn create_keychain_v1(ctx: Context<CreateKeychainV1>, keychain_name: String) -> Result <()> {
         require!(keychain_name.as_bytes().len() <= 32, KeychainError::NameTooLong);
-        let mut admin = false;
 
         let keychain_state = &mut ctx.accounts.keychain_state;
 
@@ -300,56 +300,59 @@ pub mod keychain {
     // user verifies a new (unverified) key on a keychain (which then becomes verified)
     pub fn verify_key(ctx: Context<VerifyKey>) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
-
-        let signer = *ctx.accounts.authority.to_account_info().key;
+        let user_key = ctx.accounts.user_key.key();
 
         let mut admin = false;
         // if the signer is the same as the domain authority, then this is a domain admin
         if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
+        } else {
+            // then the signer must be same as the key we're verifying
+            require!(ctx.accounts.authority.key() == user_key, KeychainError::SignerNotKey);
         }
 
-        if !admin {
-            let mut found_signer = false;
-            for user_key in &mut *keychain.keys {
-                if user_key.key == signer {
-                    found_signer = true;
-                    if user_key.verified {
-                        msg!("key already verified: {}", user_key.key);
-                    } else {
-                        msg!("key now verified: {}", user_key.key);
-                        user_key.verified = true;
-                    }
-                }
-            }
-            require!(found_signer, KeychainError::SignerNotInKeychain);
-        }
+        // find the key in the keychain
+        let some_added_key = keychain.get_key(&user_key);
+        // note: this SHOULD be redundant since we specifiy this in the constraint
+        require!(some_added_key.is_some(), KeychainError::KeyNotFound);
 
-        let domain = &ctx.accounts.domain;
+        let mut added_key = some_added_key.unwrap();
 
-        // check that the payer can pay for this
-        if ctx.accounts.authority.lamports() < domain.keychain_cost {
-            return Err(KeychainError::NotEnoughSol.into());
+        if added_key.verified {
+            msg!("key already verified: {}", added_key.key);
+        } else {
+            msg!("key now verified: {}", added_key.key);
+            added_key.verified = true;
         }
 
         // now set up the pointer/map account
         let keychain_key = &mut ctx.accounts.key;
-        keychain_key.key = signer;
+        keychain_key.key = user_key;
         keychain_key.keychain = ctx.accounts.keychain.key();
 
-        // pay for this key - transfer sol to treasury
-        invoke(
-            &system_instruction::transfer(
-                ctx.accounts.authority.key,
-                &domain.treasury,
-                domain.keychain_cost,
-            ),
-            &[
-                ctx.accounts.authority.to_account_info().clone(),
-                ctx.accounts.treasury.clone(),
-                ctx.accounts.system_program.to_account_info().clone(),
-            ],
-        )?;
+        if !admin {
+            // admins don't pay
+            let domain = &ctx.accounts.domain;
+
+            // check that the payer can pay for this
+            if ctx.accounts.authority.lamports() < domain.keychain_cost {
+                return Err(KeychainError::NotEnoughSol.into());
+            }
+
+            // pay for this key - transfer sol to treasury
+            invoke(
+                &system_instruction::transfer(
+                    ctx.accounts.authority.key,
+                    &domain.treasury,
+                    domain.keychain_cost,
+                ),
+                &[
+                    ctx.accounts.authority.to_account_info().clone(),
+                    ctx.accounts.treasury.clone(),
+                    ctx.accounts.system_program.to_account_info().clone(),
+                ],
+            )?;
+        }
 
         Ok(())
     }

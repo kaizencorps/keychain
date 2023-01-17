@@ -22,6 +22,24 @@ pub struct CurrentKeyChain {
 
 impl CurrentKeyChain {
     pub const MAX_SIZE: usize = 32 + 2 + 32 + 1 + (4 + (MAX_KEYS * 33));
+
+    pub fn has_key(&self, key: &Pubkey) -> bool {
+        for k in self.keys.iter() {
+            if k.key == *key {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    pub fn get_key(&mut self, key: &Pubkey) -> Option<&mut UserKey> {
+        for k in self.keys.iter_mut() {
+            if k.key == *key {
+                return Some(k);
+            }
+        }
+        return None;
+    }
 }
 
 // older versions

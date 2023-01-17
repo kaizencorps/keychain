@@ -12,6 +12,8 @@ pub enum KeychainError {
     MaxKeys,
     #[msg("You are not a valid signer for this keychain")]
     SignerNotInKeychain,
+    #[msg("Verifier must be the same as the key being verified")]
+    SignerNotKey,
     #[msg("That key doesn't exist on this keychain")]
     KeyNotFound,
     #[msg("Signer is not a domain admin")]

@@ -11,7 +11,7 @@ import {
   findDomainStatePda,
   findKeychainKeyPda,
   findKeychainPda,
-  findKeychainStatePda
+  findKeychainStatePda, findProfilePda
 } from "./utils";
 const { SystemProgram } = anchor.web3;
 
@@ -67,73 +67,15 @@ describe("keychain", () => {
     const [domainPda, domainPdaBump] = findDomainPda(domain, keychainProgram.programId);
     const [domainStatePda, domainStatePdaBump] = findDomainStatePda(domain, keychainProgram.programId);
 
-    /*
-    const [domainPda, domainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
-        ],
-        keychainProgram.programId
-    );
-     */
-
     // our keychain accounts
-  /*
-    const [playerKeychainPda, playerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-            Buffer.from(anchor.utils.bytes.utf8.encode(keychainName)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN_SPACE)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
-        ],
-        keychainProgram.programId
-    );
-   */
       const [playerKeychainPda, playerKeychainPdaBump] = findKeychainPda(keychainName, domain, keychainProgram.programId);
       const [playerKeychainStatePda, playerKeychainStatePdaBump] = findKeychainStatePda(playerKeychainPda, domain, keychainProgram.programId);
   // the "pointer" keychain key account
       const [playerKeychainKeyPda, playerKeychainKeyPdaBump] = findKeychainKeyPda(randomPlayerKeypair.publicKey, domain, keychainProgram.programId);
 
-  /*
-    const [playerKeychainKeyPda, playerKeychainKeyPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-            randomPlayerKeypair.publicKey.toBuffer(),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEY_SPACE)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
-        ],
-        keychainProgram.programId
-    );
-
-   */
-
-    const [key2KeyPda, key2KeyPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-            key2.publicKey.toBuffer(),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEY_SPACE)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
-        ],
-        keychainProgram.programId
-    );
-
-    const [adminPlayerKeychainPda, adminPlayerKeychainPdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-            Buffer.from(anchor.utils.bytes.utf8.encode(adminPlayername)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN_SPACE)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
-            Buffer.from(anchor.utils.bytes.utf8.encode(KEYCHAIN)),
-        ],
-        keychainProgram.programId
-    );
-
-    const [profilePda, profilePdaBump] = anchor.web3.PublicKey.findProgramAddressSync(
-        [
-            playerKeychainPda.toBuffer(),
-            Buffer.from(anchor.utils.bytes.utf8.encode(PROFILE)),
-        ],
-        profileProgram.programId
-    );
+    const [key2KeyPda, key2KeyPdaBump] = findKeychainKeyPda(key2.publicKey, domain, keychainProgram.programId);
+    const [adminPlayerKeychainPda, adminPlayerKeychainPdaBump] = findKeychainPda(adminPlayername, domain, keychainProgram.programId);
+      const [profilePda, profilePdaBump] = findProfilePda(playerKeychainPda, profileProgram.programId);
 
     console.log(`domain: ${domain}`);
     console.log(`domain pda: ${domainPda.toBase58()}`);
@@ -448,11 +390,29 @@ describe("keychain", () => {
           domain: domainPda,
           treasury: treasury.publicKey,
           authority: key2.publicKey,
+          userKey: key2.publicKey,
           systemProgram: SystemProgram.programId
       }).rpc();
 
       let key = await keychainProgram.account.keyChainKey.fetch(key2KeyPda);
-      console.log(`created key account from verifying key: ${key2KeyPda}`);
+      console.log(`created key account after verifying key: ${key2KeyPda}`);
+      console.log('-- key: ', key.key.toBase58());
+      console.log('-- keychain: ', key.keychain.toBase58());
+
+      keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
+      let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+      console.log('keychain: ', keychain);
+      console.log('-- version: ', keychainState.version);
+      console.log('-- name: ', keychain.name);
+      console.log('-- domain: ', keychain.domain.toBase58());
+      console.log('-- num keys: ', keychain.numKeys);
+      console.log('-- keys: ', keychain.keys);
+      console.log('-- key 1 address: ', keychain.keys[0].key.toBase58());
+      console.log('-- key 1: ', keychain.keys[0].key);
+      if (keychain.keys.length > 1) {
+        console.log('-- key 2 address: ', keychain.keys[1].key.toBase58());
+        console.log('-- key 2: ', keychain.keys[1].key);
+      }
 
       // now we should be able to set the pfp
       txid = await profileProgram.methods.setPfp().accounts({

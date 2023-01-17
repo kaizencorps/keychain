@@ -201,13 +201,18 @@ pub struct VerifyKey<'info> {
     #[account(
     init,
     payer = authority,
-    seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [user_key.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     space = 8 + (32 * 2)
     )]
     pub key: Account<'info, KeyChainKey>,
 
+    /// CHECK: user's wallet, gets checked against corresponding key in keychain
     // this needs to be a UserKey on the keychain
+    #[account(constraint = keychain.has_key(&user_key.key()))]
+    pub user_key: AccountInfo<'info>,
+
+    // will just be same as user_key unless it's the domain admin
     #[account(mut)]
     pub authority: Signer<'info>,
 
