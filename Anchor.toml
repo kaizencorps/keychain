@@ -3,20 +3,26 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+#keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
 
 [programs.devnet]
-keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+#keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
 
 [programs.mainnet]
-keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+#keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
+keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"
-wallet = "/Users/si/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
