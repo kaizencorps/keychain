@@ -25,6 +25,11 @@ pub enum KeychainError {
     #[msg("Wrong treasury account")]
     WrongTreasury,
     #[msg("Wrong keychain version")]
-    InvalidKeychainVersion
+    InvalidKeychainVersion,
+    #[msg("Missing required key account")]
+    MissingKeyAccount,
+    #[msg("Invalid Key account")]
+    InvalidKeyAccount
+
 
 }

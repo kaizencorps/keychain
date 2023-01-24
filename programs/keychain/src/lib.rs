@@ -400,10 +400,23 @@ pub mod keychain {
 
         // now close the key account if it exists (as marked by verified)
         if verified {
-            msg!("Closing key account: {}", ctx.accounts.key.key());
+
+            if ctx.accounts.key.is_none() {
+                // then the key account wasn't passed in but needs to have been
+                return Err(KeychainError::MissingKeyAccount.into());
+            }
+
+            msg!("Closing key account: {}", ctx.accounts.key.as_ref().unwrap().key());
             let keychain_key = &mut ctx.accounts.key;
             // send the lamports for closing to the domain treasury
             keychain_key.close(ctx.accounts.treasury.to_account_info())?;
+
+        } else {
+            // probably not necessary, but if the key wasn't verified, then a key account shouldn't have been passed in
+            if ctx.accounts.key.is_some()  {
+                // then the key account was passed in but shouldn't have been
+                return Err(KeychainError::InvalidKeyAccount.into());
+            }
         }
 
         if keychain.num_keys == 0 {

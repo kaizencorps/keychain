@@ -371,6 +371,22 @@ describe("keychain", () => {
       } catch (err) {
         // expected
       }
+
+      // see if we can remove it with the optional key account not there (this works but will mess up the rest of the test)
+    /*
+    txid = await randomPlayerProgram.methods.removeKey(key2.publicKey).accounts({
+      // don't include the key account
+        keychain: playerKeychainPda,
+        keychainState: playerKeychainStatePda,
+        domain: domainPda,
+        key: null,
+        authority: randomPlayerKeypair.publicKey,
+        treasury: treasury.publicKey
+    }).rpc();
+      console.log(">>>>> REMOVED KEY!!!! ", txid);
+     */
+
+
       // now the key2 account needs to verify
       let tx = new Transaction();
 

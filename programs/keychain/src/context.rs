@@ -239,7 +239,8 @@ pub struct RemoveKey<'info> {
     bump,
     mut,
     )]
-    pub key: Account<'info, KeyChainKey>,
+    // pub key: Account<'info, KeyChainKey>,
+    pub key: Option<Account<'info, KeyChainKey>>,
 
      // include the state in case the keychain is closed
     #[account(mut, has_one = keychain)]
