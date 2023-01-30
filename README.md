@@ -14,7 +14,7 @@ are several more potential use cases that we've identified (and also plan to uti
 Additionally, we plan on Keychain being a key component in the Kaizen Corps ecosystem, and working with
 other components that we develop such as [Bazaar](https://github.com/kaizencorps/bazaar).
 
-### Demo: https://youtu.be/gRxQT4asCzY?t=352 (it works but we had technical issues lol)
+### Showcase Demo App: https://keychain.kaizencorps.com 
 
 ## How it Works
 
@@ -41,8 +41,16 @@ Usage can be deduced from the tests located in keychain.ts
 
 # Status
 
-Keychain is not yet deployed on mainnet, as it's currently under heavy development, though we plan on deploying a version 
-within days (of this writing). A working prototype (without domains implementation) is already deployed on devnet: KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN
+An older version of Keychain is deployed at KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN, and is currently being used
+by Domination.
+
+The newest version, which includes a signifcant number of upgragrades and improvements is deployed on both devnet and
+mainnet at: Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo 
+
+# License
+
+Keychain is currently being released under the GNU GPLv3 license. Once the project and codebase is more mature, we plan to 
+move to a less restrictive license.
 
 
 
