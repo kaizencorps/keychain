@@ -220,7 +220,6 @@ pub struct SetPfp<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(name: String)]
 pub struct HelloWorld<'info> {
 
     #[account(mut)]
