@@ -40,6 +40,15 @@ impl CurrentKeyChain {
         }
         return None;
     }
+
+    pub fn has_verified_key(&self, key: &Pubkey) -> bool {
+        for k in self.keys.iter() {
+            if k.key == *key {
+                return k.verified;
+            }
+        }
+        return false;
+    }
 }
 
 // older versions
