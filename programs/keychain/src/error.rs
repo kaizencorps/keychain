@@ -20,6 +20,8 @@ pub enum KeychainError {
     NotDomainAdmin,
     #[msg("Can only add wallet of signer")]
     NotSigner,
+    #[msg("Invalid name. Must be lowercase + no spaces.")]
+    InvalidName,
     #[msg("Name too long. Max 32 characters")]
     NameTooLong,
     #[msg("Wrong treasury account")]

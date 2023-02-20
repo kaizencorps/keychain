@@ -74,7 +74,13 @@ pub mod keychain {
 
     // if done by admin, then the authority needs to be the Domain's authority
     pub fn create_keychain(ctx: Context<CreateKeychain>, keychain_name: String) -> Result <()> {
+
+        // we only reserve 32 bytes for the name
         require!(keychain_name.as_bytes().len() <= 32, KeychainError::NameTooLong);
+
+        let is_lowercase_no_spaces = keychain_name.chars().all(|c| c.is_lowercase() && c.is_whitespace());
+        require!(is_lowercase_no_spaces, KeychainError::InvalidName);
+
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
