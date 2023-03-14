@@ -1,6 +1,6 @@
 # Overview
 
-Created at the Solana Hacker House in Bogota, Keychain is a way to link multiple wallets to a single on-chain account. 
+Originally created at the Solana Hacker House in Bogota, Keychain is a way to link multiple wallets to a single on-chain account. 
 
 Keychain was created to solve [Domination's](https://domination.gg) delegated login problem: our players want to play
 Domination with their mobile phones/wallets, but keep their NFTs safely on their Ledger/desktop wallets. However, there
@@ -37,20 +37,32 @@ will be created for anyone to use.
 
 # Code
 
-Usage can be deduced from the tests located in keychain.ts
+There are 2 programs Keychain and Profile. Keychain is the main program, and Profile is a simple program that offers
+a small demonstration of something that could be built on top of Keychain. In this case, a profile/reputation system. 
+During the Grizzlython hackathon, it was used as a testbed for Clockwork integration, though the full Clockwork tests
+are located in another repo since they require a running Clockwork program to run. (Simple idea was to use a pfp 
+of a user-owned NFT as their profile picture, but which would automatically revert should the pfp leave the user's possession.)
+
+The test suite can be examined to see how to use the Keychain program.
 
 # Status
 
+# v1 
 An older version of Keychain is deployed at KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN, and is currently being used
 by Domination.
 
-The newest version, which includes a signifcant number of upgragrades and improvements is deployed on both devnet and
-mainnet at: Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo 
+# v2
 
-# License
+A newer version was developed for the Sandstorm hackathon. It includes a significant number of upgrades and improvements
+and is deployed on mainnet at: Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo 
 
-Keychain is currently being released under the GNU GPLv3 license. Once the project and codebase is more mature, we plan to 
-move to a less restrictive license.
+# v2.5
+
+Minor updates were introduced for the Grizzlython hackathon to support Stache (https://github.com/kaizencorps/stache).
+The existing program on devnet was upgraded: Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo
+
+
+
 
 
 
