@@ -13,6 +13,7 @@ pub mod constant;
 pub mod error;
 pub mod context;
 pub mod account;
+mod util;
 
 // todo: use realloc to enable any number of keys instead of limiting to 5
 
@@ -20,6 +21,7 @@ use constant::*;
 use error::*;
 use context::*;
 use account::*;
+use util::*;
 
 #[program]
 pub mod keychain {
@@ -77,8 +79,9 @@ pub mod keychain {
 
         // we only reserve 32 bytes for the name
         require!(keychain_name.as_bytes().len() <= 32, KeychainError::NameTooLong);
+        require!(keychain_name.len() >= 2, KeychainError::NameTooShort);
 
-        let is_lowercase_no_spaces = keychain_name.chars().all(|c| c.is_lowercase() && c.is_whitespace());
+        let is_lowercase_no_spaces = is_lowercase_num_no_space(&keychain_name);
         require!(is_lowercase_no_spaces, KeychainError::InvalidName);
 
         let mut admin = false;
@@ -419,10 +422,10 @@ pub mod keychain {
 
         } else {
             // probably not necessary, but if the key wasn't verified, then a key account shouldn't have been passed in
-            if ctx.accounts.key.is_some()  {
+            // if ctx.accounts.key.is_some()  {
                 // then the key account was passed in but shouldn't have been
-                return Err(KeychainError::InvalidKeyAccount.into());
-            }
+                // return Err(KeychainError::InvalidKeyAccount.into());
+            // }
         }
 
         if keychain.num_keys == 0 {

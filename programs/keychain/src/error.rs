@@ -24,6 +24,8 @@ pub enum KeychainError {
     InvalidName,
     #[msg("Name too long. Max 32 characters")]
     NameTooLong,
+    #[msg("Name too short. Min 2 characters")]
+    NameTooShort,
     #[msg("Wrong treasury account")]
     WrongTreasury,
     #[msg("Wrong keychain version")]
