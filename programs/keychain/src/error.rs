@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum KeychainError {
+    #[msg("You are not authorized to perform that action")]
+    NotAuthorized,
     #[msg("You don't have enough SOL")]
     NotEnoughSol,
     #[msg("The given key account is not the correct PDA for the given address")]
@@ -26,14 +28,18 @@ pub enum KeychainError {
     NameTooLong,
     #[msg("Name too short. Min 2 characters")]
     NameTooShort,
-    #[msg("Wrong treasury account")]
-    WrongTreasury,
+    #[msg("Invalid treasury")]
+    InvalidTreasury,
     #[msg("Wrong keychain version")]
     InvalidKeychainVersion,
     #[msg("Missing required key account")]
     MissingKeyAccount,
     #[msg("Invalid Key account")]
-    InvalidKeyAccount
+    InvalidKeyAccount,
+    #[msg("A pending action already exists")]
+    PendingActionExists,
+    #[msg("A pending action doesn't exist")]
+    NoPendingAction
 
 
 }

@@ -36,7 +36,7 @@ pub struct CreateDomain<'info> {
     pub treasury: AccountInfo<'info>,
 }
 
-// used to destroy a Domain, keychain, or whatever account
+// used to destroy a Domain, keychain, key or whatever keychain-owned account we want. note: use with extreme caution
 
 #[derive(Accounts)]
 pub struct CloseAccount<'info> {
@@ -56,7 +56,6 @@ pub struct CloseAccount<'info> {
 
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
     pub program_data: Account<'info, ProgramData>,
-    // system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -133,14 +132,21 @@ pub struct CreateKeychainV1<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program <'info, System>,
+
+    // only super-admin can call this (it's for testing)
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, Keychain>,
+
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
+    pub program_data: Account<'info, ProgramData>,
 }
 
-// for now let anyone call this method
+// only super-admin can call this
 #[derive(Accounts)]
 pub struct UpgradeKeyChain<'info> {
 
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub authority: Signer<'info>,
 
     /// CHECK:
     #[account(mut)]
@@ -151,76 +157,55 @@ pub struct UpgradeKeyChain<'info> {
 
     pub system_program: Program <'info, System>,
 
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, Keychain>,
+
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
+    pub program_data: Account<'info, ProgramData>,
 }
-
-/*
-#[derive(Accounts)]
-pub struct UpgradeOldKeyChain<'info> {
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    // reallocate size to include room for the name + state info (verison)
-    /// CHECK:
-    #[account(
-    mut,
-    realloc = 1 + 32 + 2 + 32 + (4 + (MAX_KEYS * 33)),
-    realloc::payer = user,
-    realloc::zero = true
-    )]
-    pub keychain: Account<'info, OldKeyChain>,
-    pub system_program: Program <'info, System>,
-}
- */
 
 #[derive(Accounts)]
 #[instruction(pubkey: Pubkey)]
 pub struct AddKey<'info> {
-    #[account(mut)]
+
+    #[account(mut, constraint = keychain.has_verified_key(&authority.key()) @ KeychainError::NotAuthorized)]
     pub keychain: Account<'info, CurrentKeyChain>,
 
-    // -- this doesn't work cause anchor expects a passed in account to be initialized
-    // this gets passed in but NOT initialized - just checked for existence
-    // key: Account<'info, KeyChainKey>,
+    #[account(mut, has_one = keychain)]
+    pub keychain_state: Account<'info, KeyChainState>,
 
-    /// CHECK: just reading
-    #[account()]
-    pub domain: Account<'info, CurrentDomain>,
-
-    // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
     pub authority: Signer<'info>,
+
 }
 
 #[derive(Accounts)]
 pub struct VerifyKey<'info> {
-    #[account(mut)]
+
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::KeyNotFound)]
     pub keychain: Account<'info, CurrentKeyChain>,
+
+    #[account(mut, has_one = keychain, constraint = keychain_state.has_pending_action(KeyChainActionType::AddKey) @ KeychainError::NoPendingAction)]
+    pub keychain_state: Account<'info, KeyChainState>,
 
     // the key account gets created here
     #[account(
     init,
     payer = authority,
-    seeds = [user_key.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     space = 8 + (32 * 2)
     )]
     pub key: Account<'info, KeyChainKey>,
 
-    /// CHECK: user's wallet, gets checked against corresponding key in keychain
-    // this needs to be a UserKey on the keychain
-    #[account(constraint = keychain.has_key(&user_key.key()))]
-    pub user_key: AccountInfo<'info>,
-
-    // will just be same as user_key unless it's the domain admin
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    #[account(constraint = domain.treasury == treasury.key() @ KeychainError::WrongTreasury)]
+    #[account(has_one = treasury @KeychainError::InvalidTreasury)]
     pub domain: Account<'info, CurrentDomain>,
 
-    /// CHECK: gets checked by domain constraint
-    #[account(mut, address = domain.treasury)]
+    /// CHECK: just sending lamports
+    #[account(mut, address = domain.treasury, constraint = treasury.key() == domain.treasury @ KeychainError::InvalidTreasury)]
     pub treasury: AccountInfo<'info>,
 
     pub system_program: Program <'info, System>,
@@ -229,8 +214,13 @@ pub struct VerifyKey<'info> {
 #[derive(Accounts)]
 #[instruction(pubkey: Pubkey)]
 pub struct RemoveKey<'info> {
-    #[account(mut)]
+
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::KeyNotFound)]
     pub keychain: Account<'info, CurrentKeyChain>,
+
+    // include the state in case the keychain is closed
+    #[account(mut, has_one = keychain)]
+    pub keychain_state: Account<'info, KeyChainState>,
 
     // the key account that will need to be removed
     // we close manually instead of using the close attribute since an unverified key won't have the corresponding account
@@ -239,22 +229,17 @@ pub struct RemoveKey<'info> {
     bump,
     mut,
     )]
-    // pub key: Account<'info, KeyChainKey>,
     pub key: Option<Account<'info, KeyChainKey>>,
-
-     // include the state in case the keychain is closed
-    #[account(mut, has_one = keychain)]
-    pub keychain_state: Account<'info, KeyChainState>,
-
-    // #[account(has_one = treasury)]
-    #[account(constraint = domain.treasury == treasury.key() @ KeychainError::WrongTreasury)]
-    pub domain: Account<'info, CurrentDomain>,
 
     // this needs to be an existing (and verified) UserKey in the keychain
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    /// CHECK: gets checked by domain constraint
-    #[account(mut, address = domain.treasury)]
+    // #[account(constraint = domain.treasury == treasury.key() @ KeychainError::InvalidTreasury)]
+    #[account(has_one = treasury @KeychainError::InvalidTreasury)]
+    pub domain: Account<'info, CurrentDomain>,
+
+    /// CHECK: just sending lamports
+    #[account(mut, address = domain.treasury, constraint = treasury.key() == domain.treasury @ KeychainError::InvalidTreasury)]
     pub treasury: AccountInfo<'info>
 }

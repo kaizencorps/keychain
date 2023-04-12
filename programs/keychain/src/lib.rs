@@ -36,10 +36,13 @@ pub mod keychain {
     };
     use anchor_lang::solana_program::program::invoke_signed;
 
-    pub fn create_domain(ctx: Context<CreateDomain>, name: String, keychain_cost: u64) -> Result <()> {
+    pub fn create_domain(ctx: Context<CreateDomain>, name: String, key_cost: u64) -> Result <()> {
 
         // check name length <= 32
         require!(name.as_bytes().len() <= 32, KeychainError::NameTooLong);
+
+        let is_valid_name = is_valid_name(&name);
+        require!(is_valid_name, KeychainError::InvalidName);
 
         let domain_state = &mut ctx.accounts.domain_state;
         domain_state.version = CURRENT_DOMAIN_VERSION;
@@ -48,9 +51,10 @@ pub mod keychain {
         let domain = &mut ctx.accounts.domain;
         domain.name = name;
         domain.authority = *ctx.accounts.authority.key;
-        domain.keychain_cost = keychain_cost;
+        domain.key_cost = key_cost;
         domain.treasury = *ctx.accounts.treasury.key;
         domain.bump = *ctx.bumps.get("domain").unwrap();
+        domain.keychain_action_threshold = CURRENT_KEYCHAIN_VERSION;
 
         msg!("created domain account: {}", ctx.accounts.domain.key());
         Ok(())
@@ -63,7 +67,7 @@ pub mod keychain {
 
         let remaining_lamports = ctx.accounts.account.lamports();
 
-        msg!("transfering all lamports out of account (to close) {}: {}", ctx.accounts.account.key(), remaining_lamports);
+        msg!("transferring all lamports out of account (to close) {}: {}", ctx.accounts.account.key(), remaining_lamports);
 
         // transfer sol: https://solanacookbook.com/references/programs.html#how-to-transfer-sol-in-a-program
 
@@ -79,26 +83,28 @@ pub mod keychain {
 
         // we only reserve 32 bytes for the name
         require!(keychain_name.as_bytes().len() <= 32, KeychainError::NameTooLong);
-        require!(keychain_name.len() >= 2, KeychainError::NameTooShort);
+        require!(keychain_name.len() >= 3, KeychainError::NameTooShort);
 
-        let is_lowercase_no_spaces = is_lowercase_num_no_space(&keychain_name);
-        require!(is_lowercase_no_spaces, KeychainError::InvalidName);
+        let is_valid_name = is_valid_name(&keychain_name);
+        require!(is_valid_name, KeychainError::InvalidName);
 
         let mut admin = false;
 
         // if the signer is the same as the domain authority, then this is a domain admin
+        // for now, don't allow this. this is for when a project wants to pre-allocate or create keychains on behalf of the user
+        /*
         if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
-        } else {
-            // otherwise, the wallet being added needs to be the signer
-            require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, KeychainError::NotSigner);
         }
+        */
+
+        // the wallet being added needs to be the signer (ignore admin scenario)
+        require!(ctx.accounts.authority.key() == *ctx.accounts.wallet.key, KeychainError::NotSigner);
 
         let keychain_state = &mut ctx.accounts.keychain_state;
-
-        keychain_state.key_version = CURRENT_KEYCHAIN_VERSION;
+        keychain_state.keychain_version = CURRENT_KEYCHAIN_VERSION;
         keychain_state.keychain = ctx.accounts.keychain.key();
-
+        keychain_state.action_threshold = ctx.accounts.domain.keychain_action_threshold;
 
         let key = UserKey {
             key: *ctx.accounts.wallet.to_account_info().key,
@@ -131,7 +137,6 @@ pub mod keychain {
 
         // set to older version
         keychain_state.keychain_version = CURRENT_KEYCHAIN_VERSION - 1;
-        keychain_state.key_version = CURRENT_KEYCHAIN_VERSION - 1;
         keychain_state.keychain = ctx.accounts.keychain.key();
 
         let key = UserKey {
@@ -154,7 +159,7 @@ pub mod keychain {
         Ok(())
     }
 
-    // versioning example: upgrade an old account using the keychainstate t
+    // versioning example: upgrade an old account using the keychainstate (can only be called by super-admin)
     pub fn upgrade_keychain(ctx: Context<UpgradeKeyChain>) -> Result <()> {
 
         // get the current keychain version
@@ -181,12 +186,12 @@ pub mod keychain {
                 // transfer in some lamports to make up the difference in rent
                 invoke(
                     &system_instruction::transfer(
-                        ctx.accounts.user.key,
+                        ctx.accounts.authority.key,
                         ctx.accounts.keychain.key,
                         lamport_diff,
                     ),
                     &[
-                        ctx.accounts.user.to_account_info().clone(),
+                        ctx.accounts.authority.to_account_info().clone(),
                         ctx.accounts.keychain.clone(),
                         ctx.accounts.system_program.to_account_info().clone(),
                     ],
@@ -242,60 +247,29 @@ pub mod keychain {
     }
 
     // user w/existing keychain (and verified key), adds a new (unverified) key
-    pub fn add_key(ctx: Context<AddKey>, pubkey: Pubkey) -> Result <()> {
+    pub fn add_key(ctx: Context<AddKey>, key: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
 
-        let mut found_signer = false;
-        let mut found_existing = false;
         let signer = *ctx.accounts.authority.to_account_info().key;
 
-        // see if this is an admin
-        let mut admin = false;
-
-        // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
-            admin = true;
-        }
-
-        // admins can add keys willy nilly
-        if !admin {
-            // check that the signer is in the keychain & whether this key already exists
-            for user_key in &keychain.keys {
-                if user_key.verified && user_key.key == signer {
-                    found_signer = true;
-                }
-                if pubkey == user_key.key {
-                    found_existing = true;
-                }
-            }
-            require!(found_signer, KeychainError::SignerNotInKeychain);
-            require!(!found_existing, KeychainError::KeyAlreadyExists);
-        }
-
+        require!(!keychain.has_key(&key), KeychainError::KeyAlreadyExists);
         require!(usize::from(keychain.num_keys) < MAX_KEYS, KeychainError::MaxKeys);
 
-        // verify that the passed in key account is correct
-        /*
-        let (keychain_key_address, _keychain_key_bump) =
-            Pubkey::find_program_address(&[pubkey.as_ref(), ctx.accounts.domain.name.as_bytes(), KEYCHAIN.as_bytes()], ctx.program_id);
-        require!(keychain_key_address == pubkey, KeychainError::IncorrectKeyAddress);
-         */
+        // check that there isn't already a pending action
+        let keychain_state = &mut ctx.accounts.keychain_state;
+        require!(keychain_state.pending_action.is_none(), KeychainError::PendingActionExists);
 
-        // todo: figure out how to check that the key pda does NOT exist yet
-        //       seems hard w/anchor as all passed in accounts need to be initialized
-        //       -> for regular rust: https://soldev.app/course/program-security
+        // signer automatically casts vote to approve
+        let mut pending_action = PendingKeyChainAction::new(KeyChainActionType::AddKey, key);
+        let authority_index = keychain.index_of(&signer).unwrap();
+        pending_action.votes.set_index(authority_index);
 
-        /*
-        if **ctx.accounts.key.to_account_info().try_borrow_lamports()? > 0 {
-            msg!("A Key account already exists: {}", pubkey);
-            return Err(KeychainError::KeyAlreadyExists.into());
-        }
-         */
+        // don't even bother checking the threshold cause let's not ever allow just 1 vote to add a key
 
+        // todo: MIGHT wanna add the account as an optional to mae sure it doesn't exist yet: https://solana.stackexchange.com/questions/3745/anchors-init-if-constraint-for-the-optional-initialization-of-accounts
 
-        // Build the struct.
         let player_key = UserKey {
-            key: pubkey,
+            key,
             verified: false,
         };
 
@@ -306,61 +280,55 @@ pub mod keychain {
         Ok(())
     }
 
-    // user verifies a new (unverified) key on a keychain (which then becomes verified)
+    // user verifies a new (unverified) key on a keychain - potentially becomes linked but based on votes
     pub fn verify_key(ctx: Context<VerifyKey>) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
-        let user_key = ctx.accounts.user_key.key();
+        let domain = &ctx.accounts.domain;
+        let signer = *ctx.accounts.authority.to_account_info().key;
 
-        let mut admin = false;
-        // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
-            admin = true;
-        } else {
-            // then the signer must be same as the key we're verifying
-            require!(ctx.accounts.authority.key() == user_key, KeychainError::SignerNotKey);
-        }
-
-        // find the key in the keychain
-        let some_added_key = keychain.get_key(&user_key);
-        // note: this SHOULD be redundant since we specifiy this in the constraint
-        require!(some_added_key.is_some(), KeychainError::KeyNotFound);
-
-        let mut added_key = some_added_key.unwrap();
-
-        if added_key.verified {
-            msg!("key already verified: {}", added_key.key);
-        } else {
-            msg!("key now verified: {}", added_key.key);
-            added_key.verified = true;
-        }
-
-        // now set up the pointer/map account
+        // set up the pointer/map account
         let keychain_key = &mut ctx.accounts.key;
-        keychain_key.key = user_key;
-        keychain_key.keychain = ctx.accounts.keychain.key();
+        keychain_key.key = ctx.accounts.authority.key();
+        keychain_key.keychain = keychain.key();
 
-        if !admin {
-            // admins don't pay
-            let domain = &ctx.accounts.domain;
+        // check that the payer can pay for this
+        if ctx.accounts.authority.lamports() < domain.key_cost {
+            return Err(KeychainError::NotEnoughSol.into());
+        }
 
-            // check that the payer can pay for this
-            if ctx.accounts.authority.lamports() < domain.keychain_cost {
-                return Err(KeychainError::NotEnoughSol.into());
-            }
+        // pay for this key - transfer sol to treasury
+        invoke(
+            &system_instruction::transfer(
+                ctx.accounts.authority.key,
+                &domain.treasury,
+                domain.key_cost,
+            ),
+            &[
+                ctx.accounts.authority.to_account_info().clone(),
+                ctx.accounts.treasury.clone(),
+                ctx.accounts.system_program.to_account_info().clone(),
+            ],
+        )?;
 
-            // pay for this key - transfer sol to treasury
-            invoke(
-                &system_instruction::transfer(
-                    ctx.accounts.authority.key,
-                    &domain.treasury,
-                    domain.keychain_cost,
-                ),
-                &[
-                    ctx.accounts.authority.to_account_info().clone(),
-                    ctx.accounts.treasury.clone(),
-                    ctx.accounts.system_program.to_account_info().clone(),
-                ],
-            )?;
+        // todo: extract this out to a function
+
+        // update the votes
+        let action_threshold = ctx.accounts.keychain_state.action_threshold;
+        let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
+        let authority_index = keychain.index_of(&signer).unwrap();
+        pending_action.votes.set_index(authority_index);
+
+        // check if we've reached the threshold - 0 means all keys must vote
+        if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
+            (action_threshold == 0 && u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
+
+            // we've reached the threshold - remove the pending action
+            let keychain_state = &mut ctx.accounts.keychain_state;
+            keychain_state.pending_action = None;
+
+            // and mark the key as verified
+            let mut added_key = keychain.get_key(&signer).unwrap();
+            added_key.verified = true;
         }
 
         Ok(())
