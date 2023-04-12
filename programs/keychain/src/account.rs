@@ -1,13 +1,12 @@
 use std::future::Pending;
 use anchor_lang::prelude::*;
 use crate::constant::MAX_KEYS;
+use crate::error::KeychainError;
 
-// represents a user's wallet
+// represents a user's wallet - previously stored a verified field, but was moved to keychain state
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct UserKey {
-    // size = 1 + 32 = 33
     pub key: Pubkey,
-    pub verified: bool                  // initially false after existing key adds a new one, until the added key verifies
 }
 
 // the current version of the keychain
@@ -15,9 +14,9 @@ pub struct UserKey {
 pub struct CurrentKeyChain {
     pub name: String,
     pub num_keys: u16,  // number of keys (linked or not)
-    pub domain: Pubkey,
+    pub domain: String,
     pub bump: u8,
-    // Attach a Vector of type ItemStruct to the account.
+    // Attach a Vector of type ItemStruct to the account - user keys are all verified
     pub keys: Vec<UserKey>,
 }
 
@@ -27,7 +26,7 @@ impl CurrentKeyChain {
             2 +     // num_keys
             32 +    // domain
             1 +     // bump
-            (4 + (MAX_KEYS * 33)) +   // keys
+            (4 + (MAX_KEYS * 32)) +   // keys
             192;     // extra space
 
     pub fn has_key(&self, key: &Pubkey) -> bool {
@@ -39,10 +38,10 @@ impl CurrentKeyChain {
         return false;
     }
 
-    pub fn index_of(&self, key: &Pubkey) -> Option<u8> {
+    pub fn index_of(&self, key: &Pubkey) -> Option<usize> {
         for (i, k) in self.keys.iter().enumerate() {
             if k.key == *key {
-                return Some(i as u8);
+                return Some(i);
             }
         }
         return None;
@@ -57,21 +56,24 @@ impl CurrentKeyChain {
         return None;
     }
 
-    pub fn has_verified_key(&self, key: &Pubkey) -> bool {
-        for k in self.keys.iter() {
-            if k.key == *key {
-                return k.verified;
-            }
-        }
-        return false;
+    pub fn add_key(&mut self, key: Pubkey) {
+        self.keys.push(UserKey { key });
+        self.num_keys += 1;
     }
+
+    pub fn remove_key(&mut self, key: Pubkey) {
+        let key_index = self.index_of(&key).unwrap();
+        self.keys.swap_remove(key_index);
+        self.num_keys -= 1;
+    }
+
 }
 
 // older versions
 #[account]
 pub struct KeyChainV1 {
     pub num_keys: u16,
-    pub domain: Pubkey,
+    pub domain: String,
     pub keys: Vec<UserKey>,
 }
 
@@ -146,8 +148,23 @@ impl KeyChainState {
         1 + PendingKeyChainAction::MAX_SIZE       // pending_action
         + 192;              // extra space
 
-    pub fn has_pending_action(&self, action_type: KeyChainActionType) -> bool {
+    pub fn has_pending_action_type(&self, action_type: KeyChainActionType) -> bool {
         self.pending_action.is_some() && self.pending_action.as_ref().unwrap().action_type == action_type
+    }
+
+    pub fn has_pending_action(&self) -> bool {
+        self.pending_action.is_some()
+    }
+
+    pub fn has_pending_action_key(&self, key: &Pubkey) -> bool {
+        self.pending_action.is_some() && self.pending_action.as_ref().unwrap().key == *key
+    }
+
+    pub fn pending_key(self) -> Option<Pubkey> {
+        if self.pending_action.is_some() {
+            return Some(self.pending_action.unwrap().key.clone());
+        }
+        return None;
     }
 }
 
@@ -179,14 +196,15 @@ impl SmallBitSet {
 pub struct PendingKeyChainAction {
     pub action_type: KeyChainActionType,
     pub key: Pubkey,
+    pub verified: bool,
     pub votes: SmallBitSet
 }
 
 impl PendingKeyChainAction {
-    pub const MAX_SIZE: usize = 1 + 32 + 1;
+    pub const MAX_SIZE: usize = 1 + 32 + 1 + 1;
 
     pub fn new(action_type: KeyChainActionType, key: Pubkey) -> Self {
-        Self { action_type, key, votes: SmallBitSet::new() }
+        Self { action_type, key, verified: false, votes: SmallBitSet::new() }
     }
 }
 

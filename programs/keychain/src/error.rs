@@ -39,7 +39,9 @@ pub enum KeychainError {
     #[msg("A pending action already exists")]
     PendingActionExists,
     #[msg("A pending action doesn't exist")]
-    NoPendingAction
+    NoPendingAction,
+    #[msg("Key unverified")]
+    UnverifiedKey
 
 
 }

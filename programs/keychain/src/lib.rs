@@ -88,11 +88,10 @@ pub mod keychain {
         let is_valid_name = is_valid_name(&keychain_name);
         require!(is_valid_name, KeychainError::InvalidName);
 
-        let mut admin = false;
-
         // if the signer is the same as the domain authority, then this is a domain admin
         // for now, don't allow this. this is for when a project wants to pre-allocate or create keychains on behalf of the user
         /*
+        let mut admin = false;
         if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
             admin = true;
         }
@@ -108,13 +107,12 @@ pub mod keychain {
 
         let key = UserKey {
             key: *ctx.accounts.wallet.to_account_info().key,
-            verified: true
         };
 
         let keychain = &mut ctx.accounts.keychain;
         keychain.name = keychain_name;
         keychain.num_keys = 1;
-        keychain.domain = ctx.accounts.domain.key();
+        keychain.domain = ctx.accounts.domain.name.clone();
         keychain.bump = *ctx.bumps.get("keychain").unwrap();
         keychain.keys = vec![key];
 
@@ -141,12 +139,11 @@ pub mod keychain {
 
         let key = UserKey {
             key: *ctx.accounts.wallet.to_account_info().key,
-            verified: true
         };
 
         let keychain = &mut ctx.accounts.keychain;
         keychain.num_keys = 1;
-        keychain.domain = *ctx.accounts.domain.to_account_info().key;
+        keychain.domain = ctx.accounts.domain.name.clone();
         keychain.keys = vec![key];
 
         // now set up the pointer/map account
@@ -261,35 +258,63 @@ pub mod keychain {
 
         // signer automatically casts vote to approve
         let mut pending_action = PendingKeyChainAction::new(KeyChainActionType::AddKey, key);
-        let authority_index = keychain.index_of(&signer).unwrap();
+        let authority_index = keychain.index_of(&signer).unwrap() as u8;
         pending_action.votes.set_index(authority_index);
+
+        keychain_state.pending_action = Some(pending_action);
 
         // don't even bother checking the threshold cause let's not ever allow just 1 vote to add a key
 
-        // todo: MIGHT wanna add the account as an optional to mae sure it doesn't exist yet: https://solana.stackexchange.com/questions/3745/anchors-init-if-constraint-for-the-optional-initialization-of-accounts
-
-        let player_key = UserKey {
-            key,
-            verified: false,
-        };
-
-        // Add it to the keychain.
-        keychain.keys.push(player_key);
-        keychain.num_keys += 1;
+        // todo: MIGHT wanna add the key account as an optional to mae sure it doesn't exist yet: https://solana.stackexchange.com/questions/3745/anchors-init-if-constraint-for-the-optional-initialization-of-accounts
 
         Ok(())
     }
 
+    // vote = true means confirm & vote = false means reject
+    pub fn vote_pending_action(ctx: Context<VotePendingAction>, vote: bool) -> Result <()> {
+        let keychain = &mut ctx.accounts.keychain;
+        let signer = *ctx.accounts.authority.to_account_info().key;
+
+        set_vote(keychain, &mut ctx.accounts.keychain_state, &signer, vote);
+
+        let action_threshold = ctx.accounts.keychain_state.action_threshold;
+        let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
+
+        if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
+            (action_threshold == 0 && u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
+
+            // perform the pending action
+            match pending_action.action_type {
+                KeyChainActionType::AddKey => {
+                    // make sure the key has been verified - this makes sure the keychain_key account exists
+                    require!(pending_action.verified, KeychainError::UnverifiedKey);
+                    // add the key
+                    keychain.add_key(pending_action.key);
+                },
+                KeyChainActionType::RemoveKey => {
+                    // remove the key - in this case we need to have been passed in the keychain_key account
+                    require!(ctx.accounts.keychain_key.is_some(), KeychainError::MissingKeyAccount);
+                    keychain.remove_key(pending_action.key);
+
+                    // close the keychain_key account - send lamports back to the signer
+                    let keychain_key = ctx.accounts.keychain_key.as_mut().unwrap();
+                    keychain_key.close(ctx.accounts.authority.to_account_info())?;
+                },
+            }
+
+            // clear the pending action
+            ctx.accounts.keychain_state.pending_action = None;
+        }
+
+        Ok(())
+    }
+
+    // only called when pending action = addkey
     // user verifies a new (unverified) key on a keychain - potentially becomes linked but based on votes
     pub fn verify_key(ctx: Context<VerifyKey>) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
         let domain = &ctx.accounts.domain;
         let signer = *ctx.accounts.authority.to_account_info().key;
-
-        // set up the pointer/map account
-        let keychain_key = &mut ctx.accounts.key;
-        keychain_key.key = ctx.accounts.authority.key();
-        keychain_key.keychain = keychain.key();
 
         // check that the payer can pay for this
         if ctx.accounts.authority.lamports() < domain.key_cost {
@@ -310,13 +335,17 @@ pub mod keychain {
             ],
         )?;
 
-        // todo: extract this out to a function
+        // set up the pointer/map account
+        let keychain_key = &mut ctx.accounts.keychain_key;
+        keychain_key.key = ctx.accounts.authority.key();
+        keychain_key.keychain = keychain.key();
 
         // update the votes
+        // let keychain_state = &mut ctx.accounts.keychain_state;
+        set_vote(keychain, &mut ctx.accounts.keychain_state, &signer, true);
+
         let action_threshold = ctx.accounts.keychain_state.action_threshold;
         let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
-        let authority_index = keychain.index_of(&signer).unwrap();
-        pending_action.votes.set_index(authority_index);
 
         // check if we've reached the threshold - 0 means all keys must vote
         if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
@@ -324,85 +353,40 @@ pub mod keychain {
 
             // we've reached the threshold - remove the pending action
             let keychain_state = &mut ctx.accounts.keychain_state;
+            // clear pending action
             keychain_state.pending_action = None;
 
-            // and mark the key as verified
-            let mut added_key = keychain.get_key(&signer).unwrap();
-            added_key.verified = true;
+            // Add it to the keychain.
+            keychain.add_key(signer);
+        } else {
+            // then we haven't reached the threshold yet - but make sure we've set the verified
+            pending_action.verified = true;
         }
 
         Ok(())
     }
 
     // remove a key from a keychain
-    pub fn remove_key(ctx: Context<RemoveKey>, pubkey: Pubkey) -> Result <()> {
+    pub fn remove_key(ctx: Context<RemoveKey>, key: Pubkey) -> Result <()> {
         let keychain = &mut ctx.accounts.keychain;
-
-        let mut found_signer = false;
-        let mut remove_index = usize::MAX;
-
+        let keychain_state = &mut ctx.accounts.keychain_state;
         let signer = *ctx.accounts.authority.to_account_info().key;
 
-        let mut verified = false;
-        for (index, user_key) in keychain.keys.iter().enumerate() {
-        // for &mut &user_key in &keychain.keys {
-            if user_key.key == signer {
-                found_signer = true;
-            }
-            if pubkey == user_key.key {
-                remove_index = index;
-                verified = user_key.verified;
-            }
-        }
-        // see if this is an admin
-        let mut admin = false;
-
-        // if the signer is the same as the domain authority, then this is a domain admin
-        if ctx.accounts.authority.key() == ctx.accounts.domain.authority.key() {
-            admin = true;
-        }
-
-        require!(remove_index != usize::MAX, KeychainError::KeyNotFound);
-
-        // admins can remove keys
-        if !admin {
-            require!(found_signer, KeychainError::SignerNotInKeychain);
-        }
-
-        let removed_key = keychain.keys.swap_remove(remove_index);
-        msg!("removed key at index: {}: {}", remove_index, removed_key.key);
-
-        // decrement
-        keychain.num_keys -= 1;
-
-        // now close the key account if it exists (as marked by verified)
-        if verified {
-
-            if ctx.accounts.key.is_none() {
-                // then the key account wasn't passed in but needs to have been
-                return Err(KeychainError::MissingKeyAccount.into());
-            }
-
-            msg!("Closing key account: {}", ctx.accounts.key.as_ref().unwrap().key());
-            let keychain_key = &mut ctx.accounts.key;
-            // send the lamports for closing to the domain treasury
-            keychain_key.close(ctx.accounts.treasury.to_account_info())?;
+        // if this is the only linked key, then we close the whole keychain
+        if keychain.num_keys == 1 {
+            msg!("Closing keychain: {}", keychain.key());
+            // close the keychain
+            keychain.close(ctx.accounts.authority.to_account_info())?;
+            keychain_state.close(ctx.accounts.authority.to_account_info())?;
+            let keychain_key = &mut ctx.accounts.keychain_key;
+            keychain_key.close(ctx.accounts.authority.to_account_info())?;
 
         } else {
-            // probably not necessary, but if the key wasn't verified, then a key account shouldn't have been passed in
-            // if ctx.accounts.key.is_some()  {
-                // then the key account was passed in but shouldn't have been
-                // return Err(KeychainError::InvalidKeyAccount.into());
-            // }
-        }
-
-        if keychain.num_keys == 0 {
-            // close the keychain account if this is the last key
-            msg!("No more keys. Destroying keychain: {}", keychain.key());
-
-            // the keychain and associated state account lamports get sent to the authority that removed the last key
-            keychain.close(ctx.accounts.authority.to_account_info())?;
-            ctx.accounts.keychain_state.close(ctx.accounts.authority.to_account_info())?;
+            // votes
+            let mut pending_action = PendingKeyChainAction::new(KeyChainActionType::RemoveKey, key);
+            let authority_index = keychain.index_of(&signer).unwrap() as u8;
+            pending_action.votes.set_index(authority_index);
+            keychain_state.pending_action = Some(pending_action);
         }
 
         Ok(())
