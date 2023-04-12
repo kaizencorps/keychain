@@ -281,13 +281,13 @@ pub mod keychain {
         let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
 
         if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
-            (action_threshold == 0 && u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
+            (u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
 
             // perform the pending action
             match pending_action.action_type {
                 KeyChainActionType::AddKey => {
                     // make sure the key has been verified - this makes sure the keychain_key account exists
-                    require!(pending_action.verified, KeychainError::UnverifiedKey);
+                    require!(pending_action.verified, KeychainError::KeyNotVerified);
                     // add the key
                     keychain.add_key(pending_action.key);
                 },
@@ -340,16 +340,12 @@ pub mod keychain {
         keychain_key.key = ctx.accounts.authority.key();
         keychain_key.keychain = keychain.key();
 
-        // update the votes
-        // let keychain_state = &mut ctx.accounts.keychain_state;
-        set_vote(keychain, &mut ctx.accounts.keychain_state, &signer, true);
-
         let action_threshold = ctx.accounts.keychain_state.action_threshold;
         let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
 
-        // check if we've reached the threshold - 0 means all keys must vote
-        if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
-            (action_threshold == 0 && u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
+        // either we've hit the threshold or all keys have voted
+        if (action_threshold > 0 && pending_action.count_votes() >= action_threshold) ||
+            (u16::from(pending_action.count_votes()) == keychain.num_keys) {
 
             // we've reached the threshold - remove the pending action
             let keychain_state = &mut ctx.accounts.keychain_state;
@@ -385,7 +381,7 @@ pub mod keychain {
             // votes
             let mut pending_action = PendingKeyChainAction::new(KeyChainActionType::RemoveKey, key);
             let authority_index = keychain.index_of(&signer).unwrap() as u8;
-            pending_action.votes.set_index(authority_index);
+            pending_action.vote(authority_index, true);
             keychain_state.pending_action = Some(pending_action);
         }
 

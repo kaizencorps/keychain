@@ -338,6 +338,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-spl"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cc8066fbd45e0e03edf48342c79265aa34ca76cefeace48ef6c402b6946665"
+dependencies = [
+ "anchor-lang 0.27.0",
+ "solana-program",
+ "spl-associated-token-account",
+ "spl-token",
+ "spl-token-2022",
+]
+
+[[package]]
 name = "anchor-syn"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -742,7 +755,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "358aa1fb9a328d355cababfabb5ca69134a8bc703d355fe2979442441e30d6b7"
 dependencies = [
  "anchor-lang 0.26.0",
- "anchor-spl",
+ "anchor-spl 0.26.0",
  "clockwork-utils",
 ]
 
@@ -1589,8 +1602,8 @@ dependencies = [
 name = "profile"
 version = "0.1.0"
 dependencies = [
- "anchor-lang 0.26.0",
- "anchor-spl",
+ "anchor-lang 0.27.0",
+ "anchor-spl 0.27.0",
  "clockwork-sdk",
  "keychain",
 ]

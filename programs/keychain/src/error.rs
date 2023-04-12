@@ -15,7 +15,7 @@ pub enum KeychainError {
     #[msg("You are not a valid signer for this keychain")]
     SignerNotInKeychain,
     #[msg("Verifier must be the same as the key being verified")]
-    SignerNotKey,
+    InvalidVerifier,
     #[msg("That key doesn't exist on this keychain")]
     KeyNotFound,
     #[msg("Signer is not a domain admin")]
@@ -40,8 +40,8 @@ pub enum KeychainError {
     PendingActionExists,
     #[msg("A pending action doesn't exist")]
     NoPendingAction,
-    #[msg("Key unverified")]
-    UnverifiedKey
+    #[msg("Key not verified")]
+    KeyNotVerified
 
 
 }

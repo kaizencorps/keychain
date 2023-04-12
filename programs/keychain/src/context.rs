@@ -224,8 +224,7 @@ pub struct VerifyKey<'info> {
     #[account(has_one = treasury @KeychainError::InvalidTreasury)]
     pub domain: Account<'info, CurrentDomain>,
 
-    // check that the key being verified has already been added to the keychain & check auth on the authority below
-    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::KeyNotFound)]
+    #[account(mut)]
     pub keychain: Account<'info, CurrentKeyChain>,
 
     #[account(mut, has_one = keychain, constraint = keychain_state.has_pending_action_type(KeyChainActionType::AddKey) @ KeychainError::NoPendingAction)]
@@ -235,14 +234,14 @@ pub struct VerifyKey<'info> {
     #[account(
     init,
     payer = authority,
-    seeds = [authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+    seeds = [&authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
     bump,
     space = 8 + (32 * 2)
     )]
     pub keychain_key: Account<'info, KeyChainKey>,
 
-    // here we don't check that the signer is linked cause this function links him
-    #[account(mut)]
+    // check that the signer is the pending key
+    #[account(mut, constraint = keychain_state.has_pending_action_key(&authority.key()) @ KeychainError::InvalidVerifier)]
     pub authority: Signer<'info>,
 
     /// CHECK: just sending lamports

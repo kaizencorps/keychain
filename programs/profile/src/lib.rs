@@ -76,6 +76,7 @@ pub mod profile {
         Ok(())
     }
 
+    /* - not working now after upgrade
     pub fn create_automation(ctx: Context<CreateAutomation>, automation_id: u8) -> Result<()> {
 
         msg!("creating automation...");
@@ -118,7 +119,7 @@ pub mod profile {
         //     };
 
         // let trigger = Trigger::Cron {
-        //     schedule: "*/60 * * * * * *".into(),
+        //     schedule: "[put an asterisk here if uncomment]/60 * * * * * *".into(),
         //     skippable: true,
         // };
 
@@ -179,7 +180,7 @@ pub mod profile {
 
         Ok(ThreadResponse::default())
     }
-
+     */
 
 
 }
@@ -219,6 +220,7 @@ pub struct SetPfp<'info> {
     keychain: Account<'info, CurrentKeyChain>,
 }
 
+/* -- doesn't work anymore after upgrade to anchor 0.27
 #[derive(Accounts)]
 pub struct HelloWorld<'info> {
 
@@ -229,10 +231,13 @@ pub struct HelloWorld<'info> {
     pub hello_thread: Account<'info, Thread>,
 }
 
+ */
+
 // todo: we can create an automation to trigger when the token account holding the pfp changes, which then sets/unsets the profile.pfp_token_account
 //       if the user no longer owns the pfp
 
 
+/*
 #[derive(Accounts)]
 #[instruction(automation_id: u8)]
 pub struct CreateAutomation<'info> {
@@ -258,6 +263,7 @@ pub struct CreateAutomation<'info> {
     pub system_program: Program<'info, System>,
 
 }
+ */
 
 
 // can store any sort of profile info, for now just store the selected pfp nft
@@ -291,7 +297,7 @@ pub enum ErrorCode {
 pub fn check_key(keychain: &Account<CurrentKeyChain>, userkey: Pubkey) -> bool {
     let mut found_key = false;
     for key in &keychain.keys {
-        if key.verified && key.key == userkey {
+        if key.key == userkey {
             found_key = true;
         }
     }

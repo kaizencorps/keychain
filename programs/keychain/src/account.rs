@@ -206,6 +206,22 @@ impl PendingKeyChainAction {
     pub fn new(action_type: KeyChainActionType, key: Pubkey) -> Self {
         Self { action_type, key, verified: false, votes: SmallBitSet::new() }
     }
+
+    pub fn verify(&mut self) {
+        self.verified = true;
+    }
+
+    pub fn vote(&mut self, index: u8, vote: bool) {
+        if vote {
+            self.votes.set_index(index);
+        } else {
+            self.votes.unset_index(index);
+        }
+    }
+
+    pub fn count_votes(&self) -> u8 {
+        self.votes.count_set()
+    }
 }
 
 // strictly for versioning info
