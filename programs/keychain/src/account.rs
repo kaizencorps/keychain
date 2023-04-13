@@ -1,7 +1,5 @@
-use std::future::Pending;
 use anchor_lang::prelude::*;
 use crate::constant::MAX_KEYS;
-use crate::error::KeychainError;
 
 // represents a user's wallet - previously stored a verified field, but was moved to keychain state
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]

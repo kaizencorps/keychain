@@ -1,11 +1,12 @@
 use anchor_lang::prelude::*;
-use crate::program::Keychain;
 
 // keychain v1
 // declare_id!("KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN");
 
-// keychain v2
-declare_id!("Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo");
+// keychain v2 - grizzlython
+// declare_id!("Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo");
+
+declare_id!("keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K");
 
 // declare_id!("6uZ6f5k49o76Dtczsc9neRMk5foNzJ3CuwSm6QKCVp6T");
 
@@ -25,16 +26,13 @@ use util::*;
 
 #[program]
 pub mod keychain {
-    use std::borrow::BorrowMut;
-    use std::ops::Deref;
-    use anchor_lang::{AccountsClose, system_program};
+    use anchor_lang::{AccountsClose};
     use super::*;
 
     use anchor_lang::solana_program::{
         program::{invoke},
         system_instruction,
     };
-    use anchor_lang::solana_program::program::invoke_signed;
 
     pub fn create_domain(ctx: Context<CreateDomain>, name: String, key_cost: u64) -> Result <()> {
 
@@ -117,12 +115,12 @@ pub mod keychain {
         keychain.keys = vec![key];
 
         // now set up the pointer/map account
-        let keychain_key = &mut ctx.accounts.key;
+        let keychain_key = &mut ctx.accounts.keychain_key;
         keychain_key.key = ctx.accounts.wallet.key();
         keychain_key.keychain = ctx.accounts.keychain.key();
 
         msg!("created keychain account: {}", ctx.accounts.keychain.key());
-        msg!("created key account: {}", ctx.accounts.key.key());
+        msg!("created key account: {}", ctx.accounts.keychain_key.key());
 
         Ok(())
     }
@@ -153,93 +151,6 @@ pub mod keychain {
 
         msg!("created keychain account: {}", ctx.accounts.keychain.key());
         msg!("created key account: {}", ctx.accounts.key.key());
-        Ok(())
-    }
-
-    // versioning example: upgrade an old account using the keychainstate (can only be called by super-admin)
-    pub fn upgrade_keychain(ctx: Context<UpgradeKeyChain>) -> Result <()> {
-
-        // get the current keychain version
-        let keychain_state = &mut ctx.accounts.keychain_state;
-        if keychain_state.keychain_version == CURRENT_KEYCHAIN_VERSION {
-            msg!("keychain is already up to date");
-            return Ok(());
-        } else {
-            if keychain_state.keychain_version == CURRENT_KEYCHAIN_VERSION - 1 {
-                msg!("upgrading keychain from version 1 to version 2");
-
-                let account_data_len = ctx.accounts.keychain.try_data_len()?;
-                // first let's increase the account size by 33 bytes (32 for the name + 1 for the bump)
-                let rent = Rent::get()?;
-                let new_size = account_data_len + 1 + 32;
-
-                msg!("old account size: {}, new account size: {}, rent: {}", account_data_len, new_size, rent.lamports_per_byte_year);
-
-                let new_min_balance = rent.minimum_balance(new_size);
-                let lamport_diff = new_min_balance.saturating_sub(ctx.accounts.keychain.lamports());
-
-                msg!("new min balance: {}, lamport diff: {}", new_min_balance, lamport_diff);
-
-                // transfer in some lamports to make up the difference in rent
-                invoke(
-                    &system_instruction::transfer(
-                        ctx.accounts.authority.key,
-                        ctx.accounts.keychain.key,
-                        lamport_diff,
-                    ),
-                    &[
-                        ctx.accounts.authority.to_account_info().clone(),
-                        ctx.accounts.keychain.clone(),
-                        ctx.accounts.system_program.to_account_info().clone(),
-                    ],
-                )?;
-
-                // now create our new data - first reallocate
-
-                // realloc - leave account data (assumes we'll grow the account)
-                ctx.accounts.keychain.realloc(new_size, false)?;
-
-                msg!("reallocated account");
-
-                // first deserialize the old keychain account
-                // let mut account_data = ctx.accounts.keychain.try_borrow_mut_data()?;
-
-                let mut data = ctx.accounts.keychain.try_borrow_mut_data()?;
-                let dst: &mut &[u8] = &mut &***&mut data;
-
-                // let account_data = &mut &**ctx.accounts.keychain.try_borrow_data()?;
-                let v1_keychain: KeyChainV1 = KeyChainV1::try_deserialize(dst)?;
-
-                msg!("deserialized old account data");
-
-                // fake data
-                const bump: u8 = 33;
-                let name: String = "test".to_string();
-
-                // now we create a new one
-                let new_keychain = CurrentKeyChain {
-                    name,
-                    num_keys: v1_keychain.num_keys,
-                    domain: v1_keychain.domain,
-                    bump,
-                    keys: v1_keychain.keys,
-                };
-
-                // bump the version
-                keychain_state.keychain_version = CURRENT_KEYCHAIN_VERSION;
-
-                let ddst: &mut [u8] = &mut data;
-                let mut cursor = std::io::Cursor::new(ddst);
-                new_keychain.try_serialize(&mut cursor)?;
-
-                msg!("migrated keychain to version: {}", CURRENT_KEYCHAIN_VERSION);
-
-            } else {
-                msg!("keychain version is not supported: {}", keychain_state.keychain_version);
-                return Err(KeychainError::InvalidKeychainVersion.into());
-            }
-        }
-
         Ok(())
     }
 

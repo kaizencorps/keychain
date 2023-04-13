@@ -184,7 +184,7 @@ describe("keychain", () => {
         txid = await randomPlayerProgram.methods.createKeychain(keychainName).accounts({
             keychain: playerKeychainPda,
             keychainState: playerKeychainStatePda,
-            key: playerKeychainKeyPda,
+            keychainKey: playerKeychainKeyPda,
             domain: domainPda,
             authority: randomPlayerKeypair.publicKey,
             wallet: randomPlayerKeypair.publicKey,

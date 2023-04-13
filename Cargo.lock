@@ -1246,7 +1246,7 @@ checksum = "f9b7d56ba4a8344d6be9729995e6b06f928af29998cdf79fe390cbf6b1fee838"
 
 [[package]]
 name = "keychain"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anchor-lang 0.27.0",
 ]
