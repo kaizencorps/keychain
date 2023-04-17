@@ -66,7 +66,7 @@ describe("yardsale", () => {
 
   let userKeychainPda: PublicKey;
   let domainPda: PublicKey;
-  let saleAccount: Keypair = Keypair.generate();
+  let proceedsAccount: Keypair = Keypair.generate();
   let buyer: Keypair = Keypair.generate();
 
   console.log(`\n\n...>>> user: ${provider.wallet.publicKey.toBase58()}`);
@@ -147,7 +147,8 @@ describe("yardsale", () => {
     let fromItemToken = getAssociatedTokenAddressSync(nft, provider.wallet.publicKey);
     let [listingPda] = findListingPda(nft, username, domain, yardsaleProgram.programId);
     // listing's ata
-    let itemToken = getAssociatedTokenAddressSync(nft, listingPda, true);
+    let listingItemToken = getAssociatedTokenAddressSync(nft, listingPda, true);
+
 
     // list for .5 sol
     let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.5);
@@ -156,18 +157,40 @@ describe("yardsale", () => {
       keychain: userKeychainPda,
       authority: provider.wallet.publicKey,
       item: nft,
-      fromItemToken,
+      authorityItemToken: fromItemToken,
       listing: listingPda,
-      itemToken,
+      listingItemToken: listingItemToken,
       currency: NATIVE_MINT,
-      saleAccount: saleAccount.publicKey,
+      proceeds: proceedsAccount.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      saleToken: null       // optional accounts set to null
+      proceedsToken: null       // optional accounts set to null
     }).rpc();
 
+    await connection.confirmTransaction(txid, "confirmed");
     console.log(`listed nft: ${nft.toBase58()} for ${price} sol: ${txid}`);
+
+    // check that the nft is in the listing account
+    let listing = await yardsaleProgram.account.listing.fetch(listingPda);
+    console.log(`listing: ${JSON.stringify(listing, null, 2)}`);
+
+    let tokenAmount = await connection.getTokenAccountBalance(listingItemToken);
+    assert.equal(tokenAmount.value.amount, 1, `nft should be in the item account: ${listingItemToken.toBase58()}`);
+
+    // check the listing amount
+    let listingPrice = listing.price.toNumber();
+    assert.equal(listingPrice, price, `listing price should be ${price.toNumber()}`);
+    assert.equal(listing.item.toBase58(), nft.toBase58());
+    assert.equal(listing.treasury.toBase58(), treasury.publicKey.toBase58());
+    expect(listing.bump).to.exist;
+    assert.equal(domain, listing.domain);
+    assert.equal(username, listing.keychain);
+    assert.equal(listing.currency.toBase58(), NATIVE_MINT.toBase58());
+    assert.equal(listing.proceeds.toBase58(), proceedsAccount.publicKey.toBase58());
+
+    let treasuryBalanceBefore = await connection.getBalance(treasury.publicKey);
+    console.log(`treasury balance before: ${treasuryBalanceBefore}`);
 
     let buyerItemToken = getAssociatedTokenAddressSync(nft, buyer.publicKey, false);
 
@@ -175,28 +198,57 @@ describe("yardsale", () => {
         createAssociatedTokenAccountInstruction(buyer.publicKey, buyerItemToken, buyer.publicKey, nft)
     );
 
+    // let tx = new Transaction();
+
+    let proceedsBalanceBefore = await connection.getBalance(proceedsAccount.publicKey);
+
     // now we buy it
     let ix = await yardsaleProgram.methods.purchaseItem().accounts({
       listing: listingPda,
       item: nft,
-      itemToken,
-      toItemToken: buyerItemToken,
+      listingItemToken,
+      authorityItemToken: buyerItemToken,
       currency: NATIVE_MINT,
-      saleAccount: saleAccount.publicKey,
+      proceeds: proceedsAccount.publicKey,
       authority: buyer.publicKey,
       treasury: treasury.publicKey,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       // optional accounts set to null
-      saleToken: null,
-      buyerToken: null
+      proceedsToken: null,
+      authorityCurrencyToken: null
     }).instruction();
 
     tx.add(ix);
     txid = await provider.sendAndConfirm(tx, [buyer]);
 
     console.log(`bought nft: ${nft.toBase58()} for ${price} sol: ${txid}`);
+
+    // check that the treasury got the sol from closing the listing
+    let treasuryBalanceAfter = await connection.getBalance(treasury.publicKey);
+    console.log(`treasury balance after: ${treasuryBalanceAfter}`);
+    assert.ok(treasuryBalanceAfter >= treasuryBalanceBefore, "treasury should have more sol");
+
+    // check that the seller got the proceeds
+    let proceedsBalanceAfter = await connection.getBalance(proceedsAccount.publicKey);
+    assert.ok(proceedsBalanceAfter > proceedsBalanceBefore, "proceeds should have more sol");
+
+    // find out how much proceeds the seller got
+    const proceedsAmount = proceedsBalanceAfter - proceedsBalanceBefore;
+    assert.equal(proceedsAmount, price.toNumber(), "proceeds should be equal to the listing price");
+
+    // check that the buyer got the nft
+    let buyerItemTokenBalance = await connection.getTokenAccountBalance(buyerItemToken);
+    assert.equal(buyerItemTokenBalance.value.amount, 1, `nft should be in the item account: ${buyerItemToken.toBase58()}`);
+
+    // check that listing account got closed
+    listing = await yardsaleProgram.account.listing.fetchNullable(listingPda);
+    expect(listing).to.be.null;
+
+    // check that the listing's item token account got closed
+    let listingTokenAccount = await connection.getAccountInfo(listingItemToken);
+    expect(listingTokenAccount).to.be.null;
 
   });
 

@@ -26,15 +26,15 @@ pub mod yardsale {
     pub fn list_item(ctx: Context<ListItem>, price: u64) -> Result<()> {
 
         // make sure the item exists in the from account
-        require!(ctx.accounts.from_item_token.amount == 1, YardsaleError::InvalidItem);
+        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
 
         // should we disallow a price of 0 ..?
         // require!(price > 0, YardsaleError::InvalidPrice);
 
         // first, transfer the item to the listing ata
         let cpi_accounts = Transfer {
-            from: ctx.accounts.from_item_token.to_account_info(),
-            to: ctx.accounts.item_token.to_account_info(),
+            from: ctx.accounts.authority_item_token.to_account_info(),
+            to: ctx.accounts.listing_item_token.to_account_info(),
             authority: ctx.accounts.authority.to_account_info(),
         };
 
@@ -46,9 +46,9 @@ pub mod yardsale {
         let listing = &mut ctx.accounts.listing;
         listing.price = price;
         listing.item = ctx.accounts.item.key();
-        listing.item_token = ctx.accounts.item_token.key();
+        listing.item_token = ctx.accounts.listing_item_token.key();
         listing.domain = ctx.accounts.keychain.domain.clone();
-        listing.keychain = ctx.accounts.keychain.key();
+        listing.keychain = ctx.accounts.keychain.name.clone();
         listing.currency = ctx.accounts.currency.key();
         listing.bump = *ctx.bumps.get("listing").unwrap();
         listing.treasury = ctx.accounts.domain.treasury.key();
@@ -56,12 +56,12 @@ pub mod yardsale {
         if listing.currency == NATIVE_MINT {
             // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
             // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.sale_account.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            listing.proceeds = ctx.accounts.sale_account.as_ref().unwrap().key();
+            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
         } else {
             // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.sale_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
-            listing.proceeds = ctx.accounts.sale_token.as_ref().unwrap().key();
+            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
+            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
         }
 
         Ok(())
@@ -75,10 +75,10 @@ pub mod yardsale {
         // check that the buyer has enough funds to purchase the item
         if listing.currency == NATIVE_MINT {
             require!(ctx.accounts.authority.lamports() > listing.price, YardsaleError::InsufficientFunds);
-            require!(ctx.accounts.sale_account.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
             // proper account matching listing gets checked in the constraint
 
-            // pay for the item
+            // pay for the item with sol
             invoke(
                 &system_instruction::transfer(
                     ctx.accounts.authority.key,
@@ -87,26 +87,59 @@ pub mod yardsale {
                 ),
                 &[
                     ctx.accounts.authority.to_account_info().clone(),
-                    ctx.accounts.sale_account.as_ref().unwrap().clone(),
+                    ctx.accounts.proceeds.as_ref().unwrap().clone(),
                     ctx.accounts.system_program.to_account_info().clone(),
                 ],
             )?;
         } else {
-            require!(ctx.accounts.buyer_token.is_some(), YardsaleError::FundingAccountNotSpecified);
-            require!(ctx.accounts.buyer_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
-            require!(ctx.accounts.sale_token.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            require!(ctx.accounts.authority_currency_token.is_some(), YardsaleError::FundingAccountNotSpecified);
+            require!(ctx.accounts.authority_currency_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsAccountNotSpecified);
             // proper account matching listing gets checked in the constraint
 
             // pay for the item with spl token
             let cpi_accounts = Transfer {
-                from: ctx.accounts.buyer_token.as_ref().unwrap().to_account_info(),
-                to: ctx.accounts.sale_token.as_ref().unwrap().to_account_info(),
+                from: ctx.accounts.authority_currency_token.as_ref().unwrap().to_account_info(),
+                to: ctx.accounts.proceeds_token.as_ref().unwrap().to_account_info(),
                 authority: ctx.accounts.authority.to_account_info(),
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
             token::transfer(cpi_ctx, listing.price)?;
         }
+
+        // now let's transfer the item to the buyer
+        let seeds = &[
+            listing.item.as_ref(),
+            LISTINGS.as_bytes().as_ref(),
+            listing.keychain.as_bytes().as_ref(),
+            listing.domain.as_bytes().as_ref(),
+            YARDSALE.as_bytes().as_ref(),
+            &[listing.bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.listing_item_token.to_account_info(),
+            to: ctx.accounts.authority_item_token.to_account_info(),
+            authority: ctx.accounts.listing.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer);
+        token::transfer(cpi_ctx, 1)?;
+
+        // now we can close the item listing account
+        let cpi_close_accounts = CloseAccount {
+            account: ctx.accounts.listing_item_token.to_account_info(),
+            destination: ctx.accounts.treasury.to_account_info(),
+            authority: ctx.accounts.listing.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(),
+                                                  cpi_close_accounts, signer);
+        token::close_account(cpi_ctx)?;
+
 
         Ok(())
     }

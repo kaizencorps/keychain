@@ -7,12 +7,12 @@ pub struct Listing {
     // these are for doing gPA lookups
     pub bump: u8,
     pub domain: String,
-    pub keychain: Pubkey,
-
-    pub treasury: Pubkey,
-
+    pub keychain: String,
     // todo: add collection for lookups too
     // pub collection: Pubkey,
+
+    // pulled from the domain
+    pub treasury: Pubkey,
 
     pub item: Pubkey,
     pub item_token: Pubkey,

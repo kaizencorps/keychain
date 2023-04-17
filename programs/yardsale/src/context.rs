@@ -32,7 +32,7 @@ pub struct ListItem<'info> {
         token::mint = item,
         token::authority = authority
     )]
-    pub from_item_token: Box<Account<'info, TokenAccount>>,
+    pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init,
@@ -49,7 +49,7 @@ pub struct ListItem<'info> {
         associated_token::mint = item,
         associated_token::authority = listing
     )]
-    pub item_token: Box<Account<'info, TokenAccount>>,
+    pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - native mint should be acceptable
     #[account()]
@@ -60,11 +60,11 @@ pub struct ListItem<'info> {
         mut,
         token::mint = currency,
     )]
-    pub sale_token: Option<Account<'info, TokenAccount>>,
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: this is only specified if the currency is native (will usually just be the authority, but can be any account to send proceeds to)
     #[account()]
-    pub sale_account: Option<AccountInfo<'info>>,
+    pub proceeds: Option<AccountInfo<'info>>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -83,7 +83,7 @@ pub struct PurchaseItem<'info> {
     #[account(
         mut,
         has_one = item,
-        constraint = listing.item_token == item_token.key(),
+        constraint = listing.item_token == listing_item_token.key(),
         close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
@@ -95,14 +95,16 @@ pub struct PurchaseItem<'info> {
         associated_token::mint = item,
         associated_token::authority = listing
     )]
-    pub item_token: Box<Account<'info, TokenAccount>>,
+    pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
+        // init,
+        // payer = authority,
         mut,
-        token::mint = item,
-        token::authority = authority
+        associated_token::mint = item,
+        associated_token::authority = authority
     )]
-    pub to_item_token: Box<Account<'info, TokenAccount>>,
+    pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - optional cause if it's missing then listing is in sol
 
@@ -115,16 +117,16 @@ pub struct PurchaseItem<'info> {
     #[account(
         mut,
         token::mint = currency,
-        constraint = listing.proceeds == sale_token.key(),
+        constraint = listing.proceeds == proceeds_token.key(),
     )]
-    pub sale_token: Option<Account<'info, TokenAccount>>,
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: this is only specified if the currency is native
     #[account(
         mut,
-        constraint = listing.proceeds == sale_account.key(),
+        constraint = listing.proceeds == proceeds.key(),
     )]
-    pub sale_account: Option<AccountInfo<'info>>,
+    pub proceeds: Option<AccountInfo<'info>>,
 
     // the buyer
     #[account(mut)]
@@ -136,7 +138,7 @@ pub struct PurchaseItem<'info> {
     token::mint = currency,
     token::authority = authority
     )]
-    pub buyer_token: Option<Account<'info, TokenAccount>>,
+    pub authority_currency_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: just sending lamports here when closing the listing
     #[account(
