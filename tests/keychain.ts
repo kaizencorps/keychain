@@ -214,7 +214,7 @@ describe("keychain", () => {
               accounts: {
                   keychain: playerKeychainPda,
                   keychainState: playerKeychainStatePda,
-                  key: playerKeychainKeyPda,
+                  keychainKey: playerKeychainKeyPda,
                   domain: domainPda,
                   authority: provider.wallet.publicKey,
                   wallet: provider.wallet.publicKey,
@@ -385,16 +385,15 @@ describe("keychain", () => {
         let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
         console.log("treasury balance before adding 3rd key: ", treasuryBalance);
 
-        let txid = await randomPlayerProgram.rpc.addKey(key3.publicKey, {
-          accounts: {
+        // we'll use key2 to add key3
+        let txid = await randomPlayerProgram.methods.addKey(key3.publicKey).accounts({
             keychain: playerKeychainPda,
             keychainState: playerKeychainStatePda,
-            authority: randomPlayerKeypair.publicKey,
-          }
-        });
+            authority: key2.publicKey,
+        }).signers([key2]).rpc();
         console.log(`added key ${key3.publicKey.toBase58()} to keychain: ${txid}`);
 
-        // now the key2 account needs to verify
+        // now the key3 account needs to verify
         txid = await keychainProgram.methods.verifyKey().accounts({
           domain: domainPda,
           keychain: playerKeychainPda,
@@ -405,35 +404,40 @@ describe("keychain", () => {
           systemProgram: SystemProgram.programId
         }).signers([key3]).rpc();
 
-        // since threshold is 2, we'll need to approve this 3rd key with the 2nd key
+        // check the votes. since key2 voted, value should be 2
+        let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        console.log('keychain state after verifying key3: ', keychainState);
+        assert.ok(keychainState.pendingAction.votes.data == 2, 'votes should be 2 since key 2 voted by adding');
+
+        // since threshold is 2, we'll need to approve this 3rd key with the 1st key
 
         let key = await keychainProgram.account.keyChainKey.fetch(key3KeyPda);
         console.log(`created key account after verifying key3: ${key3KeyPda}`);
 
         // keychain state will still have a pending action
-        let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
         expect(keychainState.pendingAction).to.exist;
         console.log('keychain state after verifying key2: ', keychainState);
 
-        // so now we vote w/1st key - which shouldn't change anything since already voted
+        // so now we vote w/2nd key - which shouldn't change anything since already voted
         await randomPlayerProgram.methods.votePendingAction(true).accounts({
             keychain: playerKeychainPda,
             keychainState: playerKeychainStatePda,
             keychainKey: key3KeyPda,
-            authority: randomPlayerKeypair.publicKey,
-        }).rpc();
+            authority: key2.publicKey,
+        }).signers([key2]).rpc();
 
         // still exists, same number of votes
         keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
         expect(keychainState.pendingAction).to.exist;
 
-        // so now we vote w/2nd key - which should execute the add
+        // so now we vote w/1st key - which should execute the add
         await randomPlayerProgram.methods.votePendingAction(true).accounts({
           keychain: playerKeychainPda,
           keychainState: playerKeychainStatePda,
           keychainKey: key3KeyPda,
-          authority: key2.publicKey,
-        }).signers([key2]).rpc();
+          authority: randomPlayerKeypair.publicKey,
+        }).rpc();
 
         keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
         expect(keychainState.pendingAction).to.be.null;
