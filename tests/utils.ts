@@ -1,17 +1,20 @@
 import {Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction} from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import {
-  createInitializeMint2Instruction,
+  createAssociatedTokenAccountInstruction,
+  createInitializeMint2Instruction, createMintToCheckedInstruction, getAssociatedTokenAddress,
   getMinimumBalanceForRentExemptMint,
   MINT_SIZE,
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
-import {Program} from "@project-serum/anchor";
+import {Program, Provider} from "@project-serum/anchor";
 import { Keychain } from "../target/types/keychain";
 import { Profile } from "../target/types/profile";
+import { Yardsale } from "../target/types/yardsale";
 
 export const DOMAIN = 'domination';
 export const KEYCHAIN = 'keychain';
+export const YARDSALE = 'yardsale';
 
 export const DOMAIN_STATE = 'domain_state';
 
@@ -19,10 +22,33 @@ export const KEYCHAIN_SPACE = 'keychains';
 export const KEYCHAIN_STATE_SPACE = 'keychain_states';
 export const KEY_SPACE = 'keys';
 
+export const LISTINGS_SPACE = 'listings';
+
 export const PROFILE = 'profile';
 
 const keychainProgram = anchor.workspace.Keychain as Program<Keychain>;
 const profileProgram = anchor.workspace.Profile as Program<Profile>;
+const yardsaleProgram = anchor.workspace.Profile as Program<Yardsale>;
+
+export async function createTokenMint(connection: Connection, payer: Keypair, authority: PublicKey): Promise<Keypair> {
+
+  const lamports = await getMinimumBalanceForRentExemptMint(connection);
+  const mintKey = anchor.web3.Keypair.generate();
+
+  const transaction = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: payer.publicKey,
+        newAccountPubkey: mintKey.publicKey,
+        space: MINT_SIZE,
+        lamports,
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      createInitializeMint2Instruction(mintKey.publicKey, 9, authority, authority, TOKEN_PROGRAM_ID),
+  );
+
+  await sendAndConfirmTransaction(connection, transaction, [payer, mintKey]);
+  return mintKey;
+}
 
 export async function createNFTMint(connection: Connection, payer: Keypair, authority: PublicKey): Promise<Keypair> {
 
@@ -42,6 +68,64 @@ export async function createNFTMint(connection: Connection, payer: Keypair, auth
 
   await sendAndConfirmTransaction(connection, transaction, [payer, mintKey]);
   return mintKey;
+}
+
+export async function createNFT(provider: Provider): Promise<Keypair> {
+
+  const lamports = await getMinimumBalanceForRentExemptMint(provider.connection);
+  const mint = anchor.web3.Keypair.generate();
+  let ata = await getAssociatedTokenAddress(mint.publicKey, provider.publicKey, false);
+
+  // note: doesn't create the metadata
+  const transaction = new Transaction().add(
+      SystemProgram.createAccount({
+        fromPubkey: provider.publicKey,
+        newAccountPubkey: mint.publicKey,
+        space: MINT_SIZE,
+        lamports,
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      createInitializeMint2Instruction(mint.publicKey, 0, provider.publicKey, provider.publicKey, TOKEN_PROGRAM_ID),
+      createAssociatedTokenAccountInstruction(provider.publicKey, ata, provider.publicKey, mint.publicKey),
+      createMintToCheckedInstruction(mint.publicKey, ata, provider.publicKey, 1, 0),
+      // to create the metaplex metadata
+      /*
+      createCreateMetadataAccountV3Instruction(
+          {
+            metadata: tokenMetadataPubkey,
+            mint: mint.publicKey,
+            mintAuthority: feePayer,
+            payer: feePayer,
+            updateAuthority: feePayer,
+          },
+          {
+            createMetadataAccountArgsV3: {
+              data: datav2,
+              isMutable: true,
+              collectionDetails: null
+            },
+          }
+      ),
+      createCreateMasterEditionV3Instruction(
+          {
+            edition: masterEditionPubkey,
+            mint: mint.publicKey,
+            updateAuthority: feePayer,
+            mintAuthority: feePayer,
+            payer: feePayer,
+            metadata: tokenMetadataPubkey,
+          },
+          {
+            createMasterEditionArgs: {
+              maxSupply: 0,
+            },
+          }
+      )
+       */
+
+  );
+  await provider.sendAndConfirm(transaction, [mint]);
+  return mint;
 }
 
 export const findDomainPda = (domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
@@ -109,5 +193,21 @@ export const findProfilePda = (keychainPda: PublicKey, profileprogid: PublicKey)
       ],
       profileprogid
   );
+}
 
+export const findListingPda = (nftMint: PublicKey, keychainName: string, domain: string, yardsaleprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        nftMint.toBuffer(),
+        Buffer.from(anchor.utils.bytes.utf8.encode(LISTINGS_SPACE)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(keychainName)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(domain)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(YARDSALE)),
+      ],
+      yardsaleprogid,
+  );
+}
+
+export function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

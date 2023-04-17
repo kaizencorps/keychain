@@ -8,6 +8,9 @@ pub struct Listing {
     pub bump: u8,
     pub domain: String,
     pub keychain: Pubkey,
+
+    pub treasury: Pubkey,
+
     // todo: add collection for lookups too
     // pub collection: Pubkey,
 
@@ -26,6 +29,7 @@ impl Listing {
         1 + // bump
         32 + // domain
             32 + // keychain
+            32 + // treasury
             32 + // mint
             32 + // ata
             8 + // price

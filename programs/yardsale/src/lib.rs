@@ -4,7 +4,7 @@ use crate::program::Yardsale;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 use spl_token::native_mint::ID as NATIVE_MINT;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
 
 pub mod error;
 pub mod account;
@@ -18,6 +18,8 @@ use context::*;
 
 #[program]
 pub mod yardsale {
+    use anchor_lang::solana_program::program::invoke;
+    use anchor_lang::solana_program::system_instruction;
     use super::*;
 
     // list an item
@@ -49,6 +51,7 @@ pub mod yardsale {
         listing.keychain = ctx.accounts.keychain.key();
         listing.currency = ctx.accounts.currency.key();
         listing.bump = *ctx.bumps.get("listing").unwrap();
+        listing.treasury = ctx.accounts.domain.treasury.key();
 
         if listing.currency == NATIVE_MINT {
             // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
@@ -69,8 +72,41 @@ pub mod yardsale {
 
         let listing = &ctx.accounts.listing;
 
+        // check that the buyer has enough funds to purchase the item
+        if listing.currency == NATIVE_MINT {
+            require!(ctx.accounts.authority.lamports() > listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.sale_account.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            // proper account matching listing gets checked in the constraint
 
+            // pay for the item
+            invoke(
+                &system_instruction::transfer(
+                    ctx.accounts.authority.key,
+                    &listing.proceeds,
+                    listing.price,
+                ),
+                &[
+                    ctx.accounts.authority.to_account_info().clone(),
+                    ctx.accounts.sale_account.as_ref().unwrap().clone(),
+                    ctx.accounts.system_program.to_account_info().clone(),
+                ],
+            )?;
+        } else {
+            require!(ctx.accounts.buyer_token.is_some(), YardsaleError::FundingAccountNotSpecified);
+            require!(ctx.accounts.buyer_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.sale_token.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            // proper account matching listing gets checked in the constraint
 
+            // pay for the item with spl token
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.buyer_token.as_ref().unwrap().to_account_info(),
+                to: ctx.accounts.sale_token.as_ref().unwrap().to_account_info(),
+                authority: ctx.accounts.authority.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            token::transfer(cpi_ctx, listing.price)?;
+        }
 
         Ok(())
     }

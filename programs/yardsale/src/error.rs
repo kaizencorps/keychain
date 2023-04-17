@@ -14,4 +14,8 @@ pub enum YardsaleError {
     ProceedsTokenAccountNotSpecified,
     #[msg("Sale proceeds account not specified")]
     ProceedsAccountNotSpecified,
+    #[msg("Funding account not specified")]
+    FundingAccountNotSpecified,
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
 }

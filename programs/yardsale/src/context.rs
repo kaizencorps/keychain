@@ -4,7 +4,7 @@ use crate::constant::*;
 use crate::error::*;
 
 use keychain::program::Keychain;
-use keychain::account::CurrentKeyChain;
+use keychain::account::{CurrentDomain, CurrentKeyChain};
 
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
@@ -12,7 +12,17 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 #[derive(Accounts)]
 pub struct ListItem<'info> {
 
-    #[account(constraint = keychain.has_key(&authority.key()))]
+    // todo: pass in the keychain domain as well and pull in fee info ..?
+    //      OR: create a domain for yardsale as well ..?
+
+    #[account(
+        constraint = domain.name == keychain.domain
+    )]
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
+    #[account(
+        constraint = keychain.has_key(&authority.key()),
+    )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
     pub item: Box<Account<'info, Mint>>,
@@ -27,7 +37,7 @@ pub struct ListItem<'info> {
     #[account(
         init,
         payer = authority,
-        seeds = [item.key().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+        seeds = [item.key().as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
         bump,
         space = 8 + Listing::MAX_SIZE,
     )]
@@ -42,9 +52,10 @@ pub struct ListItem<'info> {
     pub item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - native mint should be acceptable
+    #[account()]
     pub currency: Account<'info, Mint>,
 
-    // the token account to deposit the proceeds into - necessary if currency is not native
+    // the token account to deposit the proceeds into - necessary if currency is spl
     #[account(
         mut,
         token::mint = currency,
@@ -70,10 +81,10 @@ pub struct ListItem<'info> {
 pub struct PurchaseItem<'info> {
 
     #[account(
-        // seeds = [mint.key().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+        mut,
         has_one = item,
         constraint = listing.item_token == item_token.key(),
-        // bump = listing.bump,
+        close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
@@ -94,23 +105,49 @@ pub struct PurchaseItem<'info> {
     pub to_item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - optional cause if it's missing then listing is in sol
-    pub currency: Option<Account<'info, Mint>>,
 
-    // the token account to deposit the proceeds into
-    // also optional cause if currency is in sol then it's not needed
+    #[account(
+        constraint = listing.currency == currency.key(),
+    )]
+    pub currency: Account<'info, Mint>,
+
+    // needed if the currency is spl
     #[account(
         mut,
         token::mint = currency,
+        constraint = listing.proceeds == sale_token.key(),
     )]
     pub sale_token: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: this is only specified if the currency is native
+    #[account(
+        mut,
+        constraint = listing.proceeds == sale_account.key(),
+    )]
+    pub sale_account: Option<AccountInfo<'info>>,
 
     // the buyer
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    pub associated_token_program: Program<'info, AssociatedToken>,
+    // if the currency is spl, then this is the buyer's token account
+    #[account(
+    mut,
+    token::mint = currency,
+    token::authority = authority
+    )]
+    pub buyer_token: Option<Account<'info, TokenAccount>>,
 
-    // pub system_program: Program <'info, System>,
+    /// CHECK: just sending lamports here when closing the listing
+    #[account(
+        mut,
+        constraint = listing.treasury == treasury.key(),
+    )]
+    pub treasury: AccountInfo<'info>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program <'info, System>,
 }
 
 
