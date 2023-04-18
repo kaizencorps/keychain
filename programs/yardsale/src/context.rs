@@ -30,8 +30,7 @@ pub struct ListItem<'info> {
     #[account(
         mut,
         token::mint = item,
-        token::authority = authority,
-        close = authority
+        token::authority = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
