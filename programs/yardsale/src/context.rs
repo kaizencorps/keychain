@@ -57,7 +57,6 @@ pub struct ListItem<'info> {
 
     // the token account to deposit the proceeds into - necessary if currency is spl
     #[account(
-        mut,
         token::mint = currency,
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
@@ -94,11 +93,10 @@ pub struct DelistItem<'info> {
 
     pub item: Box<Account<'info, Mint>>,
 
+    // the token account the item gets returned to
     #[account(
-        init,
-        payer = authority,
-        associated_token::mint = item,
-        associated_token::authority = authority
+        token::mint = item,
+        token::authority = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
@@ -160,8 +158,6 @@ pub struct PurchaseItem<'info> {
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        // init,
-        // payer = authority,
         mut,
         associated_token::mint = item,
         associated_token::authority = authority
