@@ -30,7 +30,8 @@ pub struct ListItem<'info> {
     #[account(
         mut,
         token::mint = item,
-        token::authority = authority
+        token::authority = authority,
+        close = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
@@ -76,6 +77,68 @@ pub struct ListItem<'info> {
     // pub keychain_program: Program<'info, Keychain>,
 }
 
+#[derive(Accounts)]
+pub struct DelistItem<'info> {
+
+    #[account(
+        mut,
+        has_one = item,
+        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+        close = authority,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    #[account(
+        constraint = keychain.has_key(&authority.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    pub item: Box<Account<'info, Mint>>,
+
+    #[account(
+        init,
+        payer = authority,
+        associated_token::mint = item,
+        associated_token::authority = authority
+    )]
+    pub authority_item_token: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        associated_token::mint = item,
+        associated_token::authority = listing
+    )]
+    pub listing_item_token: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program <'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdatePrice<'info> {
+
+    #[account(
+        mut,
+        has_one = item,
+        constraint = listing.item == item.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    #[account(
+        constraint = keychain.has_key(&authority.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    pub item: Box<Account<'info, Mint>>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+}
+
 
 #[derive(Accounts)]
 pub struct PurchaseItem<'info> {
@@ -83,7 +146,7 @@ pub struct PurchaseItem<'info> {
     #[account(
         mut,
         has_one = item,
-        constraint = listing.item_token == listing_item_token.key(),
+        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key(),
         close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,

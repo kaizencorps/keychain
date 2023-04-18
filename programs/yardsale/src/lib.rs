@@ -24,7 +24,6 @@ pub mod yardsale {
 
     // list an item
     pub fn list_item(ctx: Context<ListItem>, price: u64) -> Result<()> {
-
         // make sure the item exists in the from account
         require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
 
@@ -67,9 +66,28 @@ pub mod yardsale {
         Ok(())
     }
 
-    // purchase an item
-    pub fn purchase_item(ctx: Context<PurchaseItem>) -> Result<()>  {
+    // delist an item
+    pub fn delist_item(ctx: Context<DelistItem>) -> Result<()> {
+        let listing = &ctx.accounts.listing;
 
+        let listing_item_token_ai = ctx.accounts.listing_item_token.to_account_info();
+        let auth_item_token_ai = ctx.accounts.authority_item_token.to_account_info();
+        let lamports_claimer_ai = ctx.accounts.authority.to_account_info();
+        let token_prog_ai = ctx.accounts.token_program.to_account_info();
+
+        // transfer the item to the authority
+        transfer_item_and_close(listing, listing_item_token_ai, auth_item_token_ai, lamports_claimer_ai, token_prog_ai)
+    }
+
+    // update the price of an item
+    pub fn update_price(ctx: Context<UpdatePrice>, price: u64) -> Result<()> {
+        let listing = &mut ctx.accounts.listing;
+        listing.price = price;
+        Ok(())
+    }
+
+    // purchase an item
+    pub fn purchase_item(ctx: Context<PurchaseItem>) -> Result<()> {
         let listing = &ctx.accounts.listing;
 
         // check that the buyer has enough funds to purchase the item
@@ -108,40 +126,57 @@ pub mod yardsale {
             token::transfer(cpi_ctx, listing.price)?;
         }
 
+        let listing_item_token_ai = ctx.accounts.listing_item_token.to_account_info();
+        let auth_item_token_ai = ctx.accounts.authority_item_token.to_account_info();
+        let lamports_claimer_ai = ctx.accounts.treasury.to_account_info();
+        let token_prog_ai = ctx.accounts.token_program.to_account_info();
+
         // now let's transfer the item to the buyer
-        let seeds = &[
-            listing.item.as_ref(),
-            LISTINGS.as_bytes().as_ref(),
-            listing.keychain.as_bytes().as_ref(),
-            listing.domain.as_bytes().as_ref(),
-            YARDSALE.as_bytes().as_ref(),
-            &[listing.bump],
-        ];
-        let signer = &[&seeds[..]];
+        transfer_item_and_close(listing, listing_item_token_ai, auth_item_token_ai, lamports_claimer_ai, token_prog_ai)
 
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.listing_item_token.to_account_info(),
-            to: ctx.accounts.authority_item_token.to_account_info(),
-            authority: ctx.accounts.listing.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            cpi_accounts,
-            signer);
-        token::transfer(cpi_ctx, 1)?;
-
-        // now we can close the item listing account
-        let cpi_close_accounts = CloseAccount {
-            account: ctx.accounts.listing_item_token.to_account_info(),
-            destination: ctx.accounts.treasury.to_account_info(),
-            authority: ctx.accounts.listing.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(),
-                                                  cpi_close_accounts, signer);
-        token::close_account(cpi_ctx)?;
-
-
-        Ok(())
     }
+
+}
+
+// transfers an item out of the listing's token account and closes it
+fn transfer_item_and_close<'a, 'b>(listing: &Box<Account<'a, Listing>>,
+                                   listing_item_token_ai: AccountInfo<'b>,
+                                   to_token_ai: AccountInfo<'b>,
+                                   lamports_claimer_ai: AccountInfo<'a>,
+                                   token_program: AccountInfo<'a>) -> Result<()>
+    where 'a: 'b, 'b: 'a {
+
+    let seeds = &[
+        listing.item.as_ref(),
+        LISTINGS.as_bytes().as_ref(),
+        listing.keychain.as_bytes().as_ref(),
+        listing.domain.as_bytes().as_ref(),
+        YARDSALE.as_bytes().as_ref(),
+        &[listing.bump],
+    ];
+    let signer = &[&seeds[..]];
+
+    let cpi_accounts = Transfer {
+        from: listing_item_token_ai.clone(),
+        to: to_token_ai.clone(),
+        authority: listing.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new_with_signer(
+        token_program.clone(),
+        cpi_accounts,
+        signer);
+    token::transfer(cpi_ctx, 1)?;
+
+    // now we can close the item listing account
+    let cpi_close_accounts = CloseAccount {
+        account: listing_item_token_ai.clone(),
+        destination: lamports_claimer_ai.clone(),
+        authority: listing.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new_with_signer(token_program.clone(),
+                                              cpi_close_accounts, signer);
+    token::close_account(cpi_ctx)?;
+
+    Ok(())
 }
 
