@@ -95,6 +95,7 @@ pub struct DelistItem<'info> {
 
     // the token account the item gets returned to
     #[account(
+        mut,
         token::mint = item,
         token::authority = authority
     )]
@@ -112,7 +113,6 @@ pub struct DelistItem<'info> {
 
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
-    pub system_program: Program <'info, System>,
 }
 
 #[derive(Accounts)]
