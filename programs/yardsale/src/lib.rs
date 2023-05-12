@@ -20,7 +20,93 @@ use context::*;
 pub mod yardsale {
     use anchor_lang::solana_program::program::invoke;
     use anchor_lang::solana_program::system_instruction;
+    use mpl_token_auth_rules::payload::SeedsVec;
+    use mpl_token_metadata::instruction::builders::TransferBuilder;
+    use mpl_token_metadata::instruction::TransferArgs;
+    use mpl_token_metadata::pda::find_token_record_account;
     use super::*;
+
+/*    pub fn list_pnft(ctx: Context<ListPnft>, price: u64) -> Result<()> {
+        // make sure the item exists in the from account
+        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
+
+        // first, transfer the item to the listing ata
+
+        let authority = ctx.accounts.authority.clone();
+        // Update auth data payload with the seeds of the PDA we're
+        // transferring to.
+        /*
+        let seeds = SeedsVec {
+            seeds: vec![
+                String::from("rooster").as_bytes().to_vec(),
+                authority.pubkey().as_ref().to_vec(),
+            ],
+        };
+
+        let mut nft = DigitalAsset::new();
+
+        let args = TransferArgs::V1 {
+            authorization_data: Some(auth_data.clone()),
+            amount: 1,
+        };
+
+        let params = TransferParams {
+            context: &mut context,
+            authority: &authority,
+            source_owner: &authority.pubkey(),
+            destination_owner: rooster_manager.pda(),
+            destination_token: None,
+            authorization_rules: Some(rule_set),
+            payer: &authority,
+            args: args.clone(),
+        };
+
+        nft.transfer(params).await.unwrap();
+
+        // Nft.token is updated by transfer to be the new token account where the asset currently
+        let dest_token_account = spl_token::state::Account::unpack(
+            get_account(&mut context, &nft.token.unwrap())
+                .await
+                .data
+                .as_slice(),
+        )
+            .unwrap();
+
+
+         */
+
+
+
+
+
+
+
+
+        // now create the listing
+        let listing = &mut ctx.accounts.listing;
+        listing.price = price;
+        listing.item = ctx.accounts.item.key();
+        listing.item_token = ctx.accounts.listing_item_token.key();
+        listing.domain = ctx.accounts.keychain.domain.clone();
+        listing.keychain = ctx.accounts.keychain.name.clone();
+        listing.currency = ctx.accounts.currency.key();
+        listing.bump = *ctx.bumps.get("listing").unwrap();
+        listing.treasury = ctx.accounts.domain.treasury.key();
+
+        if listing.currency == NATIVE_MINT {
+            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
+            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
+            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
+        } else {
+            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
+            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
+            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
+        }
+
+        Ok(())
+    }
+*/
 
     // list an item
     pub fn list_item(ctx: Context<ListItem>, price: u64) -> Result<()> {
@@ -85,6 +171,44 @@ pub mod yardsale {
         listing.price = price;
         Ok(())
     }
+
+    // purchase a pnft
+    pub fn transfer_pnft<'info>(
+        ctx: Context<'_, '_, '_, 'info, TransferPNFT<'info>>,
+        authorization_data: Option<AuthorizationDataLocal>,
+        rules_acc_present: bool,
+    ) -> Result<()> {
+        /*
+        let rem_acc = &mut ctx.remaining_accounts.iter();
+        let auth_rules = if rules_acc_present {
+            Some(next_account_info(rem_acc)?)
+        } else {
+            None
+        };
+        send_pnft(
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.src,
+            &ctx.accounts.dest,
+            &ctx.accounts.receiver.to_account_info(),
+            &ctx.accounts.nft_mint,
+            &ctx.accounts.nft_metadata,
+            &ctx.accounts.edition,
+            &ctx.accounts.system_program,
+            &ctx.accounts.token_program,
+            &ctx.accounts.associated_token_program,
+            &ctx.accounts.pnft_shared.instructions,
+            &ctx.accounts.owner_token_record,
+            &ctx.accounts.dest_token_record,
+            &ctx.accounts.pnft_shared.authorization_rules_program,
+            auth_rules,
+            authorization_data,
+            // None,
+        )?;
+         */
+        Ok(())
+    }
+
 
     // purchase an item
     pub fn purchase_item(ctx: Context<PurchaseItem>) -> Result<()> {
