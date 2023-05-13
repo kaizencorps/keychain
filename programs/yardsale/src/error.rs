@@ -18,4 +18,10 @@ pub enum YardsaleError {
     FundingAccountNotSpecified,
     #[msg("Insufficient funds")]
     InsufficientFunds,
+
+    // pNFT shit
+    #[msg("Bad Metadata")]
+    BadMetadata,
+    #[msg("Bad Ruleset")]
+    BadRuleset
 }

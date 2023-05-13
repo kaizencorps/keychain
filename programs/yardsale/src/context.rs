@@ -209,6 +209,7 @@ pub struct TransferPNFT<'info> {
     pub receiver: AccountInfo<'info>,
     #[account(mut)]
     pub src: Box<Account<'info, TokenAccount>>,
+
     #[account(mut)]
     pub dest: Box<Account<'info, TokenAccount>>,
     pub nft_mint: Box<Account<'info, Mint>>,

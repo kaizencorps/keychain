@@ -1,20 +1,36 @@
-use anchor_lang::prelude::*;
 use crate::program::Yardsale;
 
+use anchor_lang::prelude::*;
+use anchor_lang::solana_program::program::{invoke, invoke_signed};
+
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::associated_token::AssociatedToken;
 use spl_token::native_mint::ID as NATIVE_MINT;
 
-declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
+use mpl_token_metadata::{
+    self,
+    instruction::{builders::TransferBuilder, InstructionBuilder, TransferArgs},
+    processor::AuthorizationData,
+    state::{Metadata, ProgrammableConfig::V1, TokenMetadataAccount, TokenStandard},
+};
+
+// "prod" devnet address
+// declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
+
+// "pnft" devnet address
+declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
 
 pub mod error;
 pub mod account;
 pub mod constant;
 pub mod context;
+pub mod util;
 
 use error::*;
 use account::*;
 use constant::*;
 use context::*;
+use util::*;
 
 #[program]
 pub mod yardsale {
@@ -178,7 +194,6 @@ pub mod yardsale {
         authorization_data: Option<AuthorizationDataLocal>,
         rules_acc_present: bool,
     ) -> Result<()> {
-        /*
         let rem_acc = &mut ctx.remaining_accounts.iter();
         let auth_rules = if rules_acc_present {
             Some(next_account_info(rem_acc)?)
@@ -197,15 +212,14 @@ pub mod yardsale {
             &ctx.accounts.system_program,
             &ctx.accounts.token_program,
             &ctx.accounts.associated_token_program,
-            &ctx.accounts.pnft_shared.instructions,
+            &ctx.accounts.instructions,
             &ctx.accounts.owner_token_record,
             &ctx.accounts.dest_token_record,
-            &ctx.accounts.pnft_shared.authorization_rules_program,
+            &ctx.accounts.authorization_rules_program,
             auth_rules,
             authorization_data,
             // None,
         )?;
-         */
         Ok(())
     }
 
