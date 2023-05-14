@@ -204,7 +204,7 @@ pub mod yardsale {
             &ctx.accounts.authorization_rules_program,
             auth_rules,
             authorization_data,
-            // None,
+            None
         )?;
 
         // now create the listing
@@ -282,7 +282,7 @@ pub mod yardsale {
             &ctx.accounts.authorization_rules_program,
             auth_rules,
             authorization_data,
-            // None,
+            None
         )?;
         Ok(())
     }
@@ -406,7 +406,7 @@ pub mod yardsale {
             &ctx.accounts.authorization_rules_program,
             auth_rules,
             authorization_data,
-            // None,
+            Some(&ctx.accounts.listing)
         )?;
         Ok(())
 

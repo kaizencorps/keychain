@@ -23,7 +23,7 @@ pub fn send_pnft<'info>(
     rules_acc: Option<&AccountInfo<'info>>,
     authorization_data: Option<AuthorizationDataLocal>,
     //if passed, use signed_invoke() instead of invoke()
-    // program_signer: Option<&Account<'info, TSwap>>,
+    program_signer: Option<&Box<Account<'info, Listing>>>,
 ) -> Result<()> {
     let mut builder = TransferBuilder::new();
 
@@ -123,12 +123,22 @@ pub fn send_pnft<'info>(
         .unwrap()
         .instruction();
 
-    // if let Some(vault) = program_signer {
-    //     invoke_signed(&transfer_ix, &account_infos, &[&program_signer.seeds()])?;
-    // } else {
-    //     invoke(&transfer_ix, &account_infos)?;
-    // }
-    invoke(&transfer_ix, &account_infos)?;
+    if let Some(listing) = program_signer {
+        let seeds = &[
+            listing.item.as_ref(),
+            LISTINGS.as_bytes().as_ref(),
+            listing.keychain.as_bytes().as_ref(),
+            listing.domain.as_bytes().as_ref(),
+            YARDSALE.as_bytes().as_ref(),
+            &[listing.bump],
+        ];
+        let signer = &[&seeds[..]];
+        invoke_signed(&transfer_ix, &account_infos, signer)?;
+    } else {
+        invoke(&transfer_ix, &account_infos)?;
+    }
+
+    // invoke(&transfer_ix, &account_infos)?;
 
     Ok(())
 }
