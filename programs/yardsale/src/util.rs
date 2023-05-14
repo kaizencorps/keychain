@@ -156,3 +156,48 @@ pub fn assert_decode_metadata<'info>(
 
     Ok(Metadata::from_account_info(metadata_account)?)
 }
+
+
+// transfers an item out of the listing's token account and closes it
+pub fn transfer_item_and_close<'a, 'b>(listing: &Box<Account<'a, Listing>>,
+                                   listing_item_token_ai: AccountInfo<'b>,
+                                   to_token_ai: AccountInfo<'b>,
+                                   lamports_claimer_ai: AccountInfo<'a>,
+                                   token_program: AccountInfo<'a>) -> Result<()>
+    where 'a: 'b, 'b: 'a {
+
+    let seeds = &[
+        listing.item.as_ref(),
+        LISTINGS.as_bytes().as_ref(),
+        listing.keychain.as_bytes().as_ref(),
+        listing.domain.as_bytes().as_ref(),
+        YARDSALE.as_bytes().as_ref(),
+        &[listing.bump],
+    ];
+    let signer = &[&seeds[..]];
+
+    let cpi_accounts = Transfer {
+        from: listing_item_token_ai.clone(),
+        to: to_token_ai.clone(),
+        authority: listing.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new_with_signer(
+        token_program.clone(),
+        cpi_accounts,
+        signer);
+    token::transfer(cpi_ctx, 1)?;
+
+    // now we can close the item listing account
+    let cpi_close_accounts = CloseAccount {
+        account: listing_item_token_ai.clone(),
+        destination: lamports_claimer_ai.clone(),
+        authority: listing.to_account_info(),
+    };
+    let cpi_ctx = CpiContext::new_with_signer(token_program.clone(),
+                                              cpi_close_accounts, signer);
+    token::close_account(cpi_ctx)?;
+
+    Ok(())
+}
+
+

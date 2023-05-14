@@ -253,7 +253,6 @@ pub mod yardsale {
         Ok(())
     }
 
-    // purchase a pnft
     pub fn transfer_pnft<'info>(
         ctx: Context<'_, '_, '_, 'info, TransferPNFT<'info>>,
         authorization_data: Option<AuthorizationDataLocal>,
@@ -339,47 +338,78 @@ pub mod yardsale {
 
     }
 
+    // purchase an item
+    pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchasePNFT<'info>>,
+                                authorization_data: Option<AuthorizationDataLocal>,
+                                rules_acc_present: bool) -> Result<()> {
+        let listing = &ctx.accounts.listing;
+
+        // check that the buyer has enough funds to purchase the item
+        if listing.currency == NATIVE_MINT {
+            require!(ctx.accounts.authority.lamports() > listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            // proper account matching listing gets checked in the constraint
+
+            // pay for the item with sol
+            invoke(
+                &system_instruction::transfer(
+                    ctx.accounts.authority.key,
+                    &listing.proceeds,
+                    listing.price,
+                ),
+                &[
+                    ctx.accounts.authority.to_account_info().clone(),
+                    ctx.accounts.proceeds.as_ref().unwrap().clone(),
+                    ctx.accounts.system_program.to_account_info().clone(),
+                ],
+            )?;
+        } else {
+            require!(ctx.accounts.authority_currency_token.is_some(), YardsaleError::FundingAccountNotSpecified);
+            require!(ctx.accounts.authority_currency_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            // proper account matching listing gets checked in the constraint
+
+            // pay for the item with spl token
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.authority_currency_token.as_ref().unwrap().to_account_info(),
+                to: ctx.accounts.proceeds_token.as_ref().unwrap().to_account_info(),
+                authority: ctx.accounts.authority.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.token_program.to_account_info();
+            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+            token::transfer(cpi_ctx, listing.price)?;
+        }
+
+        // now let's transfer the item to the buyer
+        let rem_acc = &mut ctx.remaining_accounts.iter();
+        let auth_rules = if rules_acc_present {
+            Some(next_account_info(rem_acc)?)
+        } else {
+            None
+        };
+
+        send_pnft(
+            &ctx.accounts.authority.to_account_info(),
+            &ctx.accounts.authority.to_account_info(),
+            &ctx.accounts.authority_item_token,
+            &ctx.accounts.listing_item_token,
+            &ctx.accounts.listing.to_account_info(),
+            &ctx.accounts.item,
+            &ctx.accounts.item_metadata,
+            &ctx.accounts.edition,
+            &ctx.accounts.system_program,
+            &ctx.accounts.token_program,
+            &ctx.accounts.associated_token_program,
+            &ctx.accounts.instructions,
+            &ctx.accounts.listing_token_record,
+            &ctx.accounts.authority_token_record,
+            &ctx.accounts.authorization_rules_program,
+            auth_rules,
+            authorization_data,
+            // None,
+        )?;
+        Ok(())
+
+    }
+
 }
-
-// transfers an item out of the listing's token account and closes it
-fn transfer_item_and_close<'a, 'b>(listing: &Box<Account<'a, Listing>>,
-                                   listing_item_token_ai: AccountInfo<'b>,
-                                   to_token_ai: AccountInfo<'b>,
-                                   lamports_claimer_ai: AccountInfo<'a>,
-                                   token_program: AccountInfo<'a>) -> Result<()>
-    where 'a: 'b, 'b: 'a {
-
-    let seeds = &[
-        listing.item.as_ref(),
-        LISTINGS.as_bytes().as_ref(),
-        listing.keychain.as_bytes().as_ref(),
-        listing.domain.as_bytes().as_ref(),
-        YARDSALE.as_bytes().as_ref(),
-        &[listing.bump],
-    ];
-    let signer = &[&seeds[..]];
-
-    let cpi_accounts = Transfer {
-        from: listing_item_token_ai.clone(),
-        to: to_token_ai.clone(),
-        authority: listing.to_account_info(),
-    };
-    let cpi_ctx = CpiContext::new_with_signer(
-        token_program.clone(),
-        cpi_accounts,
-        signer);
-    token::transfer(cpi_ctx, 1)?;
-
-    // now we can close the item listing account
-    let cpi_close_accounts = CloseAccount {
-        account: listing_item_token_ai.clone(),
-        destination: lamports_claimer_ai.clone(),
-        authority: listing.to_account_info(),
-    };
-    let cpi_ctx = CpiContext::new_with_signer(token_program.clone(),
-                                              cpi_close_accounts, signer);
-    token::close_account(cpi_ctx)?;
-
-    Ok(())
-}
-
