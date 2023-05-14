@@ -1,4 +1,4 @@
-import {Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction} from "@solana/web3.js";
+import {BlockhashWithExpiryBlockHeight, Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction} from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import {
   createAssociatedTokenAccountInstruction,
@@ -7,10 +7,12 @@ import {
   MINT_SIZE,
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
-import {Program, Provider} from "@project-serum/anchor";
+import {AnchorProvider, Program, Provider, web3} from "@project-serum/anchor";
 import { Keychain } from "../target/types/keychain";
 import { Profile } from "../target/types/profile";
 import { Yardsale } from "../target/types/yardsale";
+import {Metaplex, WalletAdapter, walletAdapterIdentity} from "@metaplex-foundation/js";
+import {TokenStandard} from "@metaplex-foundation/mpl-token-metadata";
 
 export const DOMAIN = 'domination';
 export const KEYCHAIN = 'keychain';
@@ -26,9 +28,9 @@ export const LISTINGS_SPACE = 'listings';
 
 export const PROFILE = 'profile';
 
-const keychainProgram = anchor.workspace.Keychain as Program<Keychain>;
-const profileProgram = anchor.workspace.Profile as Program<Profile>;
-const yardsaleProgram = anchor.workspace.Profile as Program<Yardsale>;
+// const keychainProgram = anchor.workspace.Keychain as Program<Keychain>;
+// const profileProgram = anchor.workspace.Profile as Program<Profile>;
+// const yardsaleProgram = anchor.workspace.Profile as Program<Yardsale>;
 
 export async function createTokenMint(connection: Connection, payer: Keypair, authority: PublicKey): Promise<Keypair> {
 
@@ -127,6 +129,43 @@ export async function createNFT(provider: Provider): Promise<Keypair> {
   await provider.sendAndConfirm(transaction, [mint]);
   return mint;
 }
+
+export async function createpNFT(provider: AnchorProvider): Promise<PublicKey> {
+
+  const metaplex = Metaplex.make(provider.connection).use(walletAdapterIdentity(provider.wallet as WalletAdapter));
+
+  const txBuilder = await metaplex.nfts().builders().create({
+    uri: "https://famousfoxes.com/metadata/7777.json",
+    name: "pNFT #333",
+    sellerFeeBasisPoints: 100,
+    symbol: 'pFFOX',
+    creators: [{
+      address: provider.publicKey,
+      share: 100,
+    },
+    ],
+    isMutable: true,
+    isCollection: false,
+    tokenStandard: TokenStandard.ProgrammableNonFungible,
+    ruleSet: null
+  });
+
+  // let txid = await provider.sendAndConfirm(txBuilder.toTransaction(await constructBlockhashWithExpiryBlockHeight(provider.connection)));
+  let {signature, confirmResponse} = await metaplex.rpc().sendAndConfirmTransaction(txBuilder);
+
+
+  const { mintAddress } = txBuilder.getContext();
+  console.log(`   pNFT mint Success!🎉`);
+  console.log(`   Mint Address: ${mintAddress.toString()}, txid: ${signature}`);
+  console.log(`   Minted NFT: https://explorer.solana.com/address/${mintAddress.toString()}?cluster=devnet`);
+  console.log(`   Tx: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  return mintAddress;
+}
+
+async function constructBlockhashWithExpiryBlockHeight(connection: web3.Connection): Promise<BlockhashWithExpiryBlockHeight> {
+  return await connection.getLatestBlockhash();
+}
+
 
 export const findDomainPda = (domain: string, keychainprogid: PublicKey): [PublicKey, number] => {
   return anchor.web3.PublicKey.findProgramAddressSync(
