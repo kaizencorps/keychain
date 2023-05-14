@@ -493,9 +493,9 @@ pub struct PurchasePNFT<'info> {
     #[account(
         mut,
         associated_token::mint = item,
-        associated_token::authority = authority
+        associated_token::authority = buyer
     )]
-    pub authority_item_token: Box<Account<'info, TokenAccount>>,
+    pub buyer_item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - optional cause if it's missing then listing is in sol
 
@@ -519,17 +519,16 @@ pub struct PurchasePNFT<'info> {
     )]
     pub proceeds: Option<AccountInfo<'info>>,
 
-    // the buyer
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub buyer: Signer<'info>,
 
     // if the currency is spl, then this is the buyer's token account
     #[account(
         mut,
         token::mint = currency,
-        token::authority = authority
+        token::authority = buyer
     )]
-    pub authority_currency_token: Option<Account<'info, TokenAccount>>,
+    pub buyer_currency_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: just sending lamports here when closing the listing
     #[account(
@@ -596,12 +595,12 @@ pub struct PurchasePNFT<'info> {
             mpl_token_metadata::id().as_ref(),
             item.key().as_ref(),
             mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            authority_item_token.key().as_ref()
+            buyer_item_token.key().as_ref()
         ],
         seeds::program = mpl_token_metadata::id(),
         bump
     )]
-    pub authority_token_record: UncheckedAccount<'info>,
+    pub buyer_token_record: UncheckedAccount<'info>,
 
     //can't deserialize directly coz Anchor traits not implemented
     /// CHECK: address below

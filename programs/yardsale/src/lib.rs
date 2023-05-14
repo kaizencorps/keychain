@@ -346,34 +346,34 @@ pub mod yardsale {
 
         // check that the buyer has enough funds to purchase the item
         if listing.currency == NATIVE_MINT {
-            require!(ctx.accounts.authority.lamports() > listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.buyer.lamports() > listing.price, YardsaleError::InsufficientFunds);
             require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
             // proper account matching listing gets checked in the constraint
 
             // pay for the item with sol
             invoke(
                 &system_instruction::transfer(
-                    ctx.accounts.authority.key,
+                    ctx.accounts.buyer.key,
                     &listing.proceeds,
                     listing.price,
                 ),
                 &[
-                    ctx.accounts.authority.to_account_info().clone(),
+                    ctx.accounts.buyer.to_account_info().clone(),
                     ctx.accounts.proceeds.as_ref().unwrap().clone(),
                     ctx.accounts.system_program.to_account_info().clone(),
                 ],
             )?;
         } else {
-            require!(ctx.accounts.authority_currency_token.is_some(), YardsaleError::FundingAccountNotSpecified);
-            require!(ctx.accounts.authority_currency_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
+            require!(ctx.accounts.buyer_currency_token.is_some(), YardsaleError::FundingAccountNotSpecified);
+            require!(ctx.accounts.buyer_currency_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
             require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsAccountNotSpecified);
             // proper account matching listing gets checked in the constraint
 
             // pay for the item with spl token
             let cpi_accounts = Transfer {
-                from: ctx.accounts.authority_currency_token.as_ref().unwrap().to_account_info(),
+                from: ctx.accounts.buyer_currency_token.as_ref().unwrap().to_account_info(),
                 to: ctx.accounts.proceeds_token.as_ref().unwrap().to_account_info(),
-                authority: ctx.accounts.authority.to_account_info(),
+                authority: ctx.accounts.buyer.to_account_info(),
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
@@ -389,11 +389,11 @@ pub mod yardsale {
         };
 
         send_pnft(
-            &ctx.accounts.authority.to_account_info(),
-            &ctx.accounts.authority.to_account_info(),
-            &ctx.accounts.authority_item_token,
-            &ctx.accounts.listing_item_token,
             &ctx.accounts.listing.to_account_info(),
+            &ctx.accounts.buyer.to_account_info(),
+            &ctx.accounts.listing_item_token,
+            &ctx.accounts.buyer_item_token,
+            &ctx.accounts.buyer.to_account_info(),
             &ctx.accounts.item,
             &ctx.accounts.item_metadata,
             &ctx.accounts.edition,
@@ -402,7 +402,7 @@ pub mod yardsale {
             &ctx.accounts.associated_token_program,
             &ctx.accounts.instructions,
             &ctx.accounts.listing_token_record,
-            &ctx.accounts.authority_token_record,
+            &ctx.accounts.buyer_token_record,
             &ctx.accounts.authorization_rules_program,
             auth_rules,
             authorization_data,
