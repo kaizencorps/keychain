@@ -168,6 +168,71 @@ pub mod yardsale {
         Ok(())
     }
 
+    // purchase a pnft
+    pub fn list_pnft<'info>(
+        ctx: Context<'_, '_, '_, 'info, ListPNFT<'info>>,
+        price: u64,
+        authorization_data: Option<AuthorizationDataLocal>,
+        rules_acc_present: bool,
+    ) -> Result<()> {
+
+        // make sure the item exists in the from account
+        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
+
+        // first, transfer the item to the listing ata
+        let rem_acc = &mut ctx.remaining_accounts.iter();
+        let auth_rules = if rules_acc_present {
+            Some(next_account_info(rem_acc)?)
+        } else {
+            None
+        };
+        send_pnft(
+            &ctx.accounts.authority.to_account_info(),
+            &ctx.accounts.authority.to_account_info(),
+            &ctx.accounts.authority_item_token,
+            &ctx.accounts.listing_item_token,
+            &ctx.accounts.listing.to_account_info(),
+            &ctx.accounts.item,
+            &ctx.accounts.item_metadata,
+            &ctx.accounts.edition,
+            &ctx.accounts.system_program,
+            &ctx.accounts.token_program,
+            &ctx.accounts.associated_token_program,
+            &ctx.accounts.instructions,
+            &ctx.accounts.authority_token_record,
+            &ctx.accounts.listing_token_record,
+            &ctx.accounts.authorization_rules_program,
+            auth_rules,
+            authorization_data,
+            // None,
+        )?;
+
+        // now create the listing
+        let listing = &mut ctx.accounts.listing;
+        listing.price = price;
+        listing.item = ctx.accounts.item.key();
+        listing.item_token = ctx.accounts.listing_item_token.key();
+        listing.domain = ctx.accounts.keychain.domain.clone();
+        listing.keychain = ctx.accounts.keychain.name.clone();
+        listing.currency = ctx.accounts.currency.key();
+        listing.bump = *ctx.bumps.get("listing").unwrap();
+        listing.treasury = ctx.accounts.domain.treasury.key();
+
+        if listing.currency == NATIVE_MINT {
+            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
+            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
+            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
+        } else {
+            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
+            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
+            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
+        }
+
+        Ok(())
+    }
+
+
     // delist an item
     pub fn delist_item(ctx: Context<DelistItem>) -> Result<()> {
         let listing = &ctx.accounts.listing;

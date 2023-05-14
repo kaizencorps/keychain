@@ -7,21 +7,21 @@ skip-lint = false
 #keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
 keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
-yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
+yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 
 [programs.devnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
 #keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
 keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
-yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
+yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 
 [programs.mainnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
 #keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
 keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
-yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
+yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 
 [registry]
 url = "https://api.apr.dev"
