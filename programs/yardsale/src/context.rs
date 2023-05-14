@@ -581,7 +581,7 @@ pub struct PurchasePNFT<'info> {
             mpl_token_metadata::id().as_ref(),
             item.key().as_ref(),
             mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            authority_item_token.key().as_ref()
+            listing_item_token.key().as_ref()
         ],
         seeds::program = mpl_token_metadata::id(),
         bump
@@ -596,7 +596,7 @@ pub struct PurchasePNFT<'info> {
             mpl_token_metadata::id().as_ref(),
             item.key().as_ref(),
             mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            listing_item_token.key().as_ref()
+            authority_item_token.key().as_ref()
         ],
         seeds::program = mpl_token_metadata::id(),
         bump
