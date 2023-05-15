@@ -14,11 +14,11 @@ use mpl_token_metadata::{
     state::{Metadata, ProgrammableConfig::V1, TokenMetadataAccount, TokenStandard},
 };
 
-// "prod" devnet address
-// declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
+// "prod" / staging address
+declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
 
 // "pnft" devnet address
-declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
+// declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
 
 pub mod error;
 pub mod account;
@@ -288,6 +288,43 @@ pub mod yardsale {
     }
 
 
+    /*
+    pub fn transfer_pnft<'info>(
+        ctx: Context<'_, '_, '_, 'info, TransferPNFT<'info>>,
+        authorization_data: Option<AuthorizationDataLocal>,
+        rules_acc_present: bool,
+    ) -> Result<()> {
+        let rem_acc = &mut ctx.remaining_accounts.iter();
+        let auth_rules = if rules_acc_present {
+            Some(next_account_info(rem_acc)?)
+        } else {
+            None
+        };
+        send_pnft(
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.src,
+            &ctx.accounts.dest,
+            &ctx.accounts.receiver.to_account_info(),
+            &ctx.accounts.nft_mint,
+            &ctx.accounts.nft_metadata,
+            &ctx.accounts.edition,
+            &ctx.accounts.system_program,
+            &ctx.accounts.token_program,
+            &ctx.accounts.associated_token_program,
+            &ctx.accounts.instructions,
+            &ctx.accounts.owner_token_record,
+            &ctx.accounts.dest_token_record,
+            &ctx.accounts.authorization_rules_program,
+            auth_rules,
+            authorization_data,
+            None
+        )?;
+        Ok(())
+    }
+     */
+
+
     // purchase an item
     pub fn purchase_item(ctx: Context<PurchaseItem>) -> Result<()> {
         let listing = &ctx.accounts.listing;
@@ -408,6 +445,22 @@ pub mod yardsale {
             authorization_data,
             Some(&ctx.accounts.listing)
         )?;
+
+        // now we can close the item listing account
+        /* todo: put this in once the transfer works
+        let cpi_close_accounts = CloseAccount {
+            account: listing_item_token_ai.clone(),
+            destination: lamports_claimer_ai.clone(),
+            authority: listing.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(token_program.clone(),
+                                                  cpi_close_accounts, signer);
+        token::close_account(cpi_ctx)?;
+
+         */
+
+
+
         Ok(())
 
     }

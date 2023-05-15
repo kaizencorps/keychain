@@ -133,7 +133,8 @@ pub fn send_pnft<'info>(
             &[listing.bump],
         ];
         let signer = &[&seeds[..]];
-        invoke_signed(&transfer_ix, &account_infos, signer)?;
+        invoke_signed(&transfer_ix, &account_infos, signer).unwrap();
+
     } else {
         invoke(&transfer_ix, &account_infos)?;
     }
