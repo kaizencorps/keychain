@@ -132,7 +132,7 @@ pub fn send_pnft<'info>(
             YARDSALE.as_bytes().as_ref(),
             &[listing.bump],
         ];
-        invoke_signed(&transfer_ix, &account_infos, &[signer_seeds]).unwrap();
+        // invoke_signed(&transfer_ix, &account_infos, &[signer_seeds]).unwrap();
 
     } else {
         invoke(&transfer_ix, &account_infos)?;
