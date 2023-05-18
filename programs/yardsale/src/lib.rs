@@ -428,6 +428,7 @@ pub mod yardsale {
             None
         };
 
+        /*
         send_pnft(
             &ctx.accounts.listing.to_account_info(),
             &ctx.accounts.buyer.to_account_info(),
@@ -448,6 +449,8 @@ pub mod yardsale {
             authorization_data,
             Some(&ctx.accounts.listing)
         )?;
+
+         */
 
         // now we can close the item listing account
         /* todo: put this in once the transfer works
