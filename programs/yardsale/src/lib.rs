@@ -382,6 +382,7 @@ pub mod yardsale {
         let listing = &ctx.accounts.listing;
 
         // check that the buyer has enough funds to purchase the item
+        /*
         if listing.currency == NATIVE_MINT {
             require!(ctx.accounts.buyer.lamports() > listing.price, YardsaleError::InsufficientFunds);
             require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
@@ -416,6 +417,8 @@ pub mod yardsale {
             let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
             token::transfer(cpi_ctx, listing.price)?;
         }
+
+         */
 
         // now let's transfer the item to the buyer
         let rem_acc = &mut ctx.remaining_accounts.iter();
