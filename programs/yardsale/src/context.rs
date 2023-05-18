@@ -477,7 +477,12 @@ pub struct PurchasePNFT<'info> {
         mut,
         has_one = item,
         constraint = listing.item == item.key() && listing.item_token == listing_item_token.key(),
-        close = treasury,
+    // todo: remove this!!!!
+    // todo: remove this!!!!
+    // todo: remove this!!!!
+    // todo: remove this!!!!
+    // todo: remove this!!!!
+        // close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
