@@ -15,10 +15,10 @@ use mpl_token_metadata::{
 };
 
 // "prod" / staging address
-declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
+// declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
 
 // "pnft" devnet address
-// declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
+declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
 
 pub mod error;
 pub mod account;
