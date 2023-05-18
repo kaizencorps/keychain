@@ -124,7 +124,7 @@ pub fn send_pnft<'info>(
         .instruction();
 
     if let Some(listing) = program_signer {
-        let seeds = &[
+        let signer_seeds = &[
             listing.item.as_ref(),
             LISTINGS.as_bytes().as_ref(),
             listing.keychain.as_bytes().as_ref(),
@@ -132,8 +132,7 @@ pub fn send_pnft<'info>(
             YARDSALE.as_bytes().as_ref(),
             &[listing.bump],
         ];
-        let signer = &[&seeds[..]];
-        invoke_signed(&transfer_ix, &account_infos, signer).unwrap();
+        invoke_signed(&transfer_ix, &account_infos, &[signer_seeds]).unwrap();
 
     } else {
         invoke(&transfer_ix, &account_infos)?;
