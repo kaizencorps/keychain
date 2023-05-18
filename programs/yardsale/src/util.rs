@@ -91,6 +91,7 @@ pub fn send_pnft<'info>(
     }
 
     //if auth rules passed in, validate & include it in CPI call
+        /*
     if let Some(config) = metadata.programmable_config {
         match config {
             V1 { rule_set } => {
@@ -137,6 +138,8 @@ pub fn send_pnft<'info>(
     } else {
         invoke(&transfer_ix, &account_infos)?;
     }
+
+         */
 
     // invoke(&transfer_ix, &account_infos)?;
 
