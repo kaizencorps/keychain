@@ -74,72 +74,72 @@ pub fn send_pnft<'info>(
         //   16. `[optional]` Token Authorization Rules account
         //passed in below, if needed
     ];
+    /*
 
-    let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
-    if let Some(standard) = metadata.token_standard {
-        if standard == TokenStandard::ProgrammableNonFungible {
-            msg!("programmable standard triggered");
-            //1. add to builder
-            builder
-                .owner_token_record(owner_token_record.key())
-                .destination_token_record(dest_token_record.key());
+let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
+if let Some(standard) = metadata.token_standard {
+    if standard == TokenStandard::ProgrammableNonFungible {
+        msg!("programmable standard triggered");
+        //1. add to builder
+        builder
+            .owner_token_record(owner_token_record.key())
+            .destination_token_record(dest_token_record.key());
 
-            //2. add to accounts (if try to pass these for non-pNFT, will get owner errors, since they don't exist)
-            account_infos.push(owner_token_record.to_account_info());
-            account_infos.push(dest_token_record.to_account_info());
-        }
+        //2. add to accounts (if try to pass these for non-pNFT, will get owner errors, since they don't exist)
+        account_infos.push(owner_token_record.to_account_info());
+        account_infos.push(dest_token_record.to_account_info());
     }
+}
 
-    //if auth rules passed in, validate & include it in CPI call
-        /*
-    if let Some(config) = metadata.programmable_config {
-        match config {
-            V1 { rule_set } => {
-                if let Some(rule_set) = rule_set {
-                    msg!("ruleset triggered");
-                    //safe to unwrap here, it's expected
-                    let rules_acc = rules_acc.unwrap();
+//if auth rules passed in, validate & include it in CPI call
+if let Some(config) = metadata.programmable_config {
+    match config {
+        V1 { rule_set } => {
+            if let Some(rule_set) = rule_set {
+                msg!("ruleset triggered");
+                //safe to unwrap here, it's expected
+                let rules_acc = rules_acc.unwrap();
 
-                    //1. validate
-                    require!(rule_set == *rules_acc.key, YardsaleError::BadRuleset);
+                //1. validate
+                require!(rule_set == *rules_acc.key, YardsaleError::BadRuleset);
 
-                    //2. add to builder
-                    builder.authorization_rules_program(*authorization_rules_program.key);
-                    builder.authorization_rules(*rules_acc.key);
+                //2. add to builder
+                builder.authorization_rules_program(*authorization_rules_program.key);
+                builder.authorization_rules(*rules_acc.key);
 
-                    //3. add to accounts
-                    account_infos.push(authorization_rules_program.to_account_info());
-                    account_infos.push(rules_acc.to_account_info());
-                }
+                //3. add to accounts
+                account_infos.push(authorization_rules_program.to_account_info());
+                account_infos.push(rules_acc.to_account_info());
             }
         }
     }
+}
 
-    let transfer_ix = builder
-        .build(TransferArgs::V1 {
-            amount: 1, //currently 1 only
-            authorization_data: authorization_data
-                .map(|authorization_data| AuthorizationData::try_from(authorization_data).unwrap()),
-        })
-        .unwrap()
-        .instruction();
+let transfer_ix = builder
+    .build(TransferArgs::V1 {
+        amount: 1, //currently 1 only
+        authorization_data: authorization_data
+            .map(|authorization_data| AuthorizationData::try_from(authorization_data).unwrap()),
+    })
+    .unwrap()
+    .instruction();
 
-    if let Some(listing) = program_signer {
-        let signer_seeds = &[
-            listing.item.as_ref(),
-            LISTINGS.as_bytes().as_ref(),
-            listing.keychain.as_bytes().as_ref(),
-            listing.domain.as_bytes().as_ref(),
-            YARDSALE.as_bytes().as_ref(),
-            &[listing.bump],
-        ];
-        // invoke_signed(&transfer_ix, &account_infos, &[signer_seeds]).unwrap();
+if let Some(listing) = program_signer {
+    let signer_seeds = &[
+        listing.item.as_ref(),
+        LISTINGS.as_bytes().as_ref(),
+        listing.keychain.as_bytes().as_ref(),
+        listing.domain.as_bytes().as_ref(),
+        YARDSALE.as_bytes().as_ref(),
+        &[listing.bump],
+    ];
+    // invoke_signed(&transfer_ix, &account_infos, &[signer_seeds]).unwrap();
 
-    } else {
-        invoke(&transfer_ix, &account_infos)?;
-    }
+} else {
+    invoke(&transfer_ix, &account_infos)?;
+}
 
-         */
+     */
 
     // invoke(&transfer_ix, &account_infos)?;
 
