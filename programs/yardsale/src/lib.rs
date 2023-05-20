@@ -474,47 +474,8 @@ pub mod yardsale {
             // .authorization_rules(ctx.accounts.authorization_rules.key())
             .payer(buyer_key);
 
-        let mut account_infos = vec![
-            //   0. `[writable]` Token account
-            listing_token_ata.to_account_info(),
-            //   1. `[]` Token account owner
-            listing.to_account_info(),
-            //   2. `[writable]` Destination token account
-            ctx.accounts.buyer_item_token.to_account_info(),
-            //   3. `[]` Destination token account owner
-            ctx.accounts.buyer.to_account_info(),
-            //   4. `[]` Mint of token asset
-            ctx.accounts.item.to_account_info(),
-            //   5. `[writable]` Metadata account
-            ctx.accounts.item_metadata.to_account_info(),
-            //   6. `[optional]` Edition of token asset
-            ctx.accounts.edition.to_account_info(),
-            //   7. `[signer] Transfer authority (token or delegate owner)
-            ctx.accounts.listing_token_record.to_account_info(),
-            //   8. `[optional, writable]` Owner record PDA
-            ctx.accounts.buyer_token_record.to_account_info(),
-            //   9. `[optional, writable]` Destination record PDA
 
-            //////// /todo: finish. ruleset info ..?
-            /*
-            ctx.accounts
-            //   10. `[signer, writable]` Payer
-            payer.to_account_info(),
-            //   11. `[]` System Program
-            system_program.to_account_info(),
-            //   12. `[]` Instructions sysvar account
-            instructions.to_account_info(),
-            //   13. `[]` SPL Token Program
-            token_program.to_account_info(),
-            //   14. `[]` SPL Associated Token Account program
-            ata_program.to_account_info(),
-            //   15. `[optional]` Token Authorization Rules Program
-            //passed in below, if needed
-            //   16. `[optional]` Token Authorization Rules account
-            //passed in below, if needed
 
-             */
-        ];
 
 
 
