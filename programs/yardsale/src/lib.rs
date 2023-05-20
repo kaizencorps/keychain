@@ -430,28 +430,92 @@ pub mod yardsale {
         };
          */
 
-        send_pnft(
-            &ctx.accounts.listing.to_account_info(),
-            &ctx.accounts.buyer.to_account_info(),
-            &ctx.accounts.listing_item_token,
-            &ctx.accounts.buyer_item_token,
-            &ctx.accounts.buyer.to_account_info(),
-            &ctx.accounts.item,
-            &ctx.accounts.item_metadata,
-            &ctx.accounts.edition,
-            &ctx.accounts.system_program,
-            &ctx.accounts.token_program,
-            &ctx.accounts.associated_token_program,
-            &ctx.accounts.instructions,
-            &ctx.accounts.listing_token_record,
-            &ctx.accounts.buyer_token_record,
-            &ctx.accounts.authorization_rules_program,
-            // auth_rules,
-            None,
-            authorization_data,
-            // Some(&ctx.accounts.listing)
-            None
-        )?;
+        // send_pnft(
+        //     &ctx.accounts.listing.to_account_info(),
+        //     &ctx.accounts.buyer.to_account_info(),
+        //     &ctx.accounts.listing_item_token,
+        //     &ctx.accounts.buyer_item_token,
+        //     &ctx.accounts.buyer.to_account_info(),
+        //     &ctx.accounts.item,
+        //     &ctx.accounts.item_metadata,
+        //     &ctx.accounts.edition,
+        //     &ctx.accounts.system_program,
+        //     &ctx.accounts.token_program,
+        //     &ctx.accounts.associated_token_program,
+        //     &ctx.accounts.instructions,
+        //     &ctx.accounts.listing_token_record,
+        //     &ctx.accounts.buyer_token_record,
+        //     &ctx.accounts.authorization_rules_program,
+        //     // auth_rules,
+        //     None,
+        //     authorization_data,
+        //     // Some(&ctx.accounts.listing)
+        //     None
+        // )?;
+        //
+
+        let mut builder = TransferBuilder::new();
+        let listing_key = ctx.accounts.listing.to_account_info().key();
+        let buyer_key = ctx.accounts.buyer.key();
+        let listing_token_ata = ctx.accounts.listing_item_token.to_account_info();
+
+        builder
+            .authority(listing_key)
+            .token_owner(listing_key)
+            .token(ctx.accounts.listing_item_token.key())
+            .destination_owner(buyer_key)
+            .destination(ctx.accounts.buyer_item_token.key())
+            .mint(ctx.accounts.item.key())
+            .metadata(ctx.accounts.item_metadata.key())
+            .edition(ctx.accounts.edition.key())
+            .owner_token_record(ctx.accounts.listing_token_record.key())
+            .destination_token_record(ctx.accounts.buyer_token_record.key())
+            .authorization_rules_program(ctx.accounts.authorization_rules_program.key())
+            // .authorization_rules(ctx.accounts.authorization_rules.key())
+            .payer(buyer_key);
+
+        let mut account_infos = vec![
+            //   0. `[writable]` Token account
+            listing_token_ata.to_account_info(),
+            //   1. `[]` Token account owner
+            listing.to_account_info(),
+            //   2. `[writable]` Destination token account
+            ctx.accounts.buyer_item_token.to_account_info(),
+            //   3. `[]` Destination token account owner
+            ctx.accounts.buyer.to_account_info(),
+            //   4. `[]` Mint of token asset
+            ctx.accounts.item.to_account_info(),
+            //   5. `[writable]` Metadata account
+            ctx.accounts.item_metadata.to_account_info(),
+            //   6. `[optional]` Edition of token asset
+            ctx.accounts.edition.to_account_info(),
+            //   7. `[signer] Transfer authority (token or delegate owner)
+            ctx.accounts.listing_token_record.to_account_info(),
+            //   8. `[optional, writable]` Owner record PDA
+            ctx.accounts.buyer_token_record.to_account_info(),
+            //   9. `[optional, writable]` Destination record PDA
+
+            //////// /todo: finish. ruleset info ..?
+            /*
+            ctx.accounts
+            //   10. `[signer, writable]` Payer
+            payer.to_account_info(),
+            //   11. `[]` System Program
+            system_program.to_account_info(),
+            //   12. `[]` Instructions sysvar account
+            instructions.to_account_info(),
+            //   13. `[]` SPL Token Program
+            token_program.to_account_info(),
+            //   14. `[]` SPL Associated Token Account program
+            ata_program.to_account_info(),
+            //   15. `[optional]` Token Authorization Rules Program
+            //passed in below, if needed
+            //   16. `[optional]` Token Authorization Rules account
+            //passed in below, if needed
+
+             */
+        ];
+
 
 
 
