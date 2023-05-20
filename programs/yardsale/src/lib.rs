@@ -446,13 +446,14 @@ pub mod yardsale {
             &ctx.accounts.listing_token_record,
             &ctx.accounts.buyer_token_record,
             &ctx.accounts.authorization_rules_program,
-            auth_rules,
+            // auth_rules,
+            None,
             authorization_data,
             Some(&ctx.accounts.listing)
         )?;
 
 
-        / now we can close the item listing account
+        // now we can close the item listing account
         /* todo: put this in once the transfer works
         let cpi_close_accounts = CloseAccount {
             account: listing_item_token_ai.clone(),
