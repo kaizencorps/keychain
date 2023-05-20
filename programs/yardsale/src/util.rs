@@ -37,7 +37,7 @@ pub fn send_pnft<'info>(
         .metadata(nft_metadata.key())
         .edition(nft_edition.key())
         .payer(*payer.key);
-
+/*
     let mut account_infos = vec![
         //   0. `[writable]` Token account
         source_ata.to_account_info(),
@@ -74,6 +74,8 @@ pub fn send_pnft<'info>(
         //   16. `[optional]` Token Authorization Rules account
         //passed in below, if needed
     ];
+
+ */
 
     /*
 let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
