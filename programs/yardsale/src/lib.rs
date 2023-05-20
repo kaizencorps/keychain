@@ -421,14 +421,15 @@ pub mod yardsale {
          */
 
         // now let's transfer the item to the buyer
+        /*
         let auth_rules = if rules_acc_present {
             let rem_acc = &mut ctx.remaining_accounts.iter();
             Some(next_account_info(rem_acc)?)
         } else {
             None
         };
+         */
 
-        /*
         send_pnft(
             &ctx.accounts.listing.to_account_info(),
             &ctx.accounts.buyer.to_account_info(),
@@ -451,9 +452,7 @@ pub mod yardsale {
         )?;
 
 
-         */
-
-        // now we can close the item listing account
+        / now we can close the item listing account
         /* todo: put this in once the transfer works
         let cpi_close_accounts = CloseAccount {
             account: listing_item_token_ai.clone(),

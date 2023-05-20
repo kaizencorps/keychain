@@ -74,7 +74,6 @@ pub fn send_pnft<'info>(
         //   16. `[optional]` Token Authorization Rules account
         //passed in below, if needed
     ];
-    /*
 
 let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
 if let Some(standard) = metadata.token_standard {
@@ -92,6 +91,7 @@ if let Some(standard) = metadata.token_standard {
 }
 
 //if auth rules passed in, validate & include it in CPI call
+    /*
 if let Some(config) = metadata.programmable_config {
     match config {
         V1 { rule_set } => {
@@ -114,6 +114,7 @@ if let Some(config) = metadata.programmable_config {
         }
     }
 }
+*/
 
 let transfer_ix = builder
     .build(TransferArgs::V1 {
@@ -139,7 +140,6 @@ if let Some(listing) = program_signer {
     invoke(&transfer_ix, &account_infos)?;
 }
 
-     */
 
     // invoke(&transfer_ix, &account_infos)?;
 
