@@ -25,57 +25,57 @@ pub fn send_pnft<'info>(
     //if passed, use signed_invoke() instead of invoke()
     program_signer: Option<&Box<Account<'info, Listing>>>,
 ) -> Result<()> {
-    let mut builder = TransferBuilder::new();
+    /*
+        let mut builder = TransferBuilder::new();
 
-    builder
-        .authority(*authority_and_owner.key)
-        .token_owner(*authority_and_owner.key)
-        .token(source_ata.key())
-        .destination_owner(*dest_owner.key)
-        .destination(dest_ata.key())
-        .mint(nft_mint.key())
-        .metadata(nft_metadata.key())
-        .edition(nft_edition.key())
-        .payer(*payer.key);
-/*
-    let mut account_infos = vec![
-        //   0. `[writable]` Token account
-        source_ata.to_account_info(),
-        //   1. `[]` Token account owner
-        authority_and_owner.to_account_info(),
-        //   2. `[writable]` Destination token account
-        dest_ata.to_account_info(),
-        //   3. `[]` Destination token account owner
-        dest_owner.to_account_info(),
-        //   4. `[]` Mint of token asset
-        nft_mint.to_account_info(),
-        //   5. `[writable]` Metadata account
-        nft_metadata.to_account_info(),
-        //   6. `[optional]` Edition of token asset
-        nft_edition.to_account_info(),
-        //   7. `[signer] Transfer authority (token or delegate owner)
-        authority_and_owner.to_account_info(),
-        //   8. `[optional, writable]` Owner record PDA
-        //passed in below, if needed
-        //   9. `[optional, writable]` Destination record PDA
-        //passed in below, if needed
-        //   10. `[signer, writable]` Payer
-        payer.to_account_info(),
-        //   11. `[]` System Program
-        system_program.to_account_info(),
-        //   12. `[]` Instructions sysvar account
-        instructions.to_account_info(),
-        //   13. `[]` SPL Token Program
-        token_program.to_account_info(),
-        //   14. `[]` SPL Associated Token Account program
-        ata_program.to_account_info(),
-        //   15. `[optional]` Token Authorization Rules Program
-        //passed in below, if needed
-        //   16. `[optional]` Token Authorization Rules account
-        //passed in below, if needed
-    ];
+        builder
+            .authority(*authority_and_owner.key)
+            .token_owner(*authority_and_owner.key)
+            .token(source_ata.key())
+            .destination_owner(*dest_owner.key)
+            .destination(dest_ata.key())
+            .mint(nft_mint.key())
+            .metadata(nft_metadata.key())
+            .edition(nft_edition.key())
+            .payer(*payer.key);
+        let mut account_infos = vec![
+            //   0. `[writable]` Token account
+            source_ata.to_account_info(),
+            //   1. `[]` Token account owner
+            authority_and_owner.to_account_info(),
+            //   2. `[writable]` Destination token account
+            dest_ata.to_account_info(),
+            //   3. `[]` Destination token account owner
+            dest_owner.to_account_info(),
+            //   4. `[]` Mint of token asset
+            nft_mint.to_account_info(),
+            //   5. `[writable]` Metadata account
+            nft_metadata.to_account_info(),
+            //   6. `[optional]` Edition of token asset
+            nft_edition.to_account_info(),
+            //   7. `[signer] Transfer authority (token or delegate owner)
+            authority_and_owner.to_account_info(),
+            //   8. `[optional, writable]` Owner record PDA
+            //passed in below, if needed
+            //   9. `[optional, writable]` Destination record PDA
+            //passed in below, if needed
+            //   10. `[signer, writable]` Payer
+            payer.to_account_info(),
+            //   11. `[]` System Program
+            system_program.to_account_info(),
+            //   12. `[]` Instructions sysvar account
+            instructions.to_account_info(),
+            //   13. `[]` SPL Token Program
+            token_program.to_account_info(),
+            //   14. `[]` SPL Associated Token Account program
+            ata_program.to_account_info(),
+            //   15. `[optional]` Token Authorization Rules Program
+            //passed in below, if needed
+            //   16. `[optional]` Token Authorization Rules account
+            //passed in below, if needed
+        ];
 
- */
+     */
 
     /*
 let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
