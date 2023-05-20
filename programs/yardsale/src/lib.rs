@@ -430,7 +430,6 @@ pub mod yardsale {
         };
          */
 
-        /*
         send_pnft(
             &ctx.accounts.listing.to_account_info(),
             &ctx.accounts.buyer.to_account_info(),
@@ -450,10 +449,10 @@ pub mod yardsale {
             // auth_rules,
             None,
             authorization_data,
-            Some(&ctx.accounts.listing)
+            // Some(&ctx.accounts.listing)
+            None
         )?;
 
-         */
 
 
         // now we can close the item listing account
