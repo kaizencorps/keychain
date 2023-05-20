@@ -421,15 +421,12 @@ pub mod yardsale {
          */
 
         // now let's transfer the item to the buyer
-        /*
         let auth_rules = if rules_acc_present {
             let rem_acc = &mut ctx.remaining_accounts.iter();
             Some(next_account_info(rem_acc)?)
         } else {
             None
         };
-
-         */
 
         /*
         send_pnft(
