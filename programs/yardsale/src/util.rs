@@ -75,6 +75,7 @@ pub fn send_pnft<'info>(
         //passed in below, if needed
     ];
 
+    /*
 let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
 if let Some(standard) = metadata.token_standard {
     if standard == TokenStandard::ProgrammableNonFungible {
@@ -89,6 +90,8 @@ if let Some(standard) = metadata.token_standard {
         account_infos.push(dest_token_record.to_account_info());
     }
 }
+
+     */
 
 //if auth rules passed in, validate & include it in CPI call
     /*
@@ -116,6 +119,7 @@ if let Some(config) = metadata.programmable_config {
 }
 */
 
+    /*
 let transfer_ix = builder
     .build(TransferArgs::V1 {
         amount: 1, //currently 1 only
@@ -140,6 +144,8 @@ if let Some(listing) = program_signer {
     invoke(&transfer_ix, &account_infos)?;
 }
 
+
+     */
 
     // invoke(&transfer_ix, &account_infos)?;
 
