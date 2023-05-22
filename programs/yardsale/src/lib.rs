@@ -42,88 +42,6 @@ pub mod yardsale {
     use mpl_token_metadata::pda::find_token_record_account;
     use super::*;
 
-/*    pub fn list_pnft(ctx: Context<ListPnft>, price: u64) -> Result<()> {
-        // make sure the item exists in the from account
-        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
-
-        // first, transfer the item to the listing ata
-
-        let authority = ctx.accounts.authority.clone();
-        // Update auth data payload with the seeds of the PDA we're
-        // transferring to.
-        /*
-        let seeds = SeedsVec {
-            seeds: vec![
-                String::from("rooster").as_bytes().to_vec(),
-                authority.pubkey().as_ref().to_vec(),
-            ],
-        };
-
-        let mut nft = DigitalAsset::new();
-
-        let args = TransferArgs::V1 {
-            authorization_data: Some(auth_data.clone()),
-            amount: 1,
-        };
-
-        let params = TransferParams {
-            context: &mut context,
-            authority: &authority,
-            source_owner: &authority.pubkey(),
-            destination_owner: rooster_manager.pda(),
-            destination_token: None,
-            authorization_rules: Some(rule_set),
-            payer: &authority,
-            args: args.clone(),
-        };
-
-        nft.transfer(params).await.unwrap();
-
-        // Nft.token is updated by transfer to be the new token account where the asset currently
-        let dest_token_account = spl_token::state::Account::unpack(
-            get_account(&mut context, &nft.token.unwrap())
-                .await
-                .data
-                .as_slice(),
-        )
-            .unwrap();
-
-
-         */
-
-
-
-
-
-
-
-
-        // now create the listing
-        let listing = &mut ctx.accounts.listing;
-        listing.price = price;
-        listing.item = ctx.accounts.item.key();
-        listing.item_token = ctx.accounts.listing_item_token.key();
-        listing.domain = ctx.accounts.keychain.domain.clone();
-        listing.keychain = ctx.accounts.keychain.name.clone();
-        listing.currency = ctx.accounts.currency.key();
-        listing.bump = *ctx.bumps.get("listing").unwrap();
-        listing.treasury = ctx.accounts.domain.treasury.key();
-
-        if listing.currency == NATIVE_MINT {
-            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
-        } else {
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
-        }
-
-        Ok(())
-    }
-*/
-
     // list an item
     pub fn list_item(ctx: Context<ListItem>, price: u64) -> Result<()> {
         // make sure the item exists in the from account
@@ -168,7 +86,6 @@ pub mod yardsale {
         Ok(())
     }
 
-    // purchase a pnft
     pub fn list_pnft<'info>(
         ctx: Context<'_, '_, '_, 'info, ListPNFT<'info>>,
         price: u64,
@@ -232,7 +149,6 @@ pub mod yardsale {
         Ok(())
     }
 
-
     // delist an item
     pub fn delist_item(ctx: Context<DelistItem>) -> Result<()> {
         let listing = &ctx.accounts.listing;
@@ -253,117 +169,36 @@ pub mod yardsale {
         Ok(())
     }
 
-    pub fn transfer_pnft<'info>(
-        ctx: Context<'_, '_, '_, 'info, TransferPNFT<'info>>,
-        authorization_data: Option<AuthorizationDataLocal>,
-        rules_acc_present: bool,
-    ) -> Result<()> {
-        let rem_acc = &mut ctx.remaining_accounts.iter();
-        let auth_rules = if rules_acc_present {
-            Some(next_account_info(rem_acc)?)
-        } else {
-            None
-        };
-        send_pnft(
-            &ctx.accounts.owner.to_account_info(),
-            &ctx.accounts.owner.to_account_info(),
-            &ctx.accounts.src,
-            &ctx.accounts.dest,
-            &ctx.accounts.receiver.to_account_info(),
-            &ctx.accounts.nft_mint,
-            &ctx.accounts.nft_metadata,
-            &ctx.accounts.edition,
-            &ctx.accounts.system_program,
-            &ctx.accounts.token_program,
-            &ctx.accounts.associated_token_program,
-            &ctx.accounts.instructions,
-            &ctx.accounts.owner_token_record,
-            &ctx.accounts.dest_token_record,
-            &ctx.accounts.authorization_rules_program,
-            auth_rules,
-            authorization_data,
-            None
-        )?;
-        Ok(())
-    }
-
-
-    /*
-    pub fn transfer_pnft<'info>(
-        ctx: Context<'_, '_, '_, 'info, TransferPNFT<'info>>,
-        authorization_data: Option<AuthorizationDataLocal>,
-        rules_acc_present: bool,
-    ) -> Result<()> {
-        let rem_acc = &mut ctx.remaining_accounts.iter();
-        let auth_rules = if rules_acc_present {
-            Some(next_account_info(rem_acc)?)
-        } else {
-            None
-        };
-        send_pnft(
-            &ctx.accounts.owner.to_account_info(),
-            &ctx.accounts.owner.to_account_info(),
-            &ctx.accounts.src,
-            &ctx.accounts.dest,
-            &ctx.accounts.receiver.to_account_info(),
-            &ctx.accounts.nft_mint,
-            &ctx.accounts.nft_metadata,
-            &ctx.accounts.edition,
-            &ctx.accounts.system_program,
-            &ctx.accounts.token_program,
-            &ctx.accounts.associated_token_program,
-            &ctx.accounts.instructions,
-            &ctx.accounts.owner_token_record,
-            &ctx.accounts.dest_token_record,
-            &ctx.accounts.authorization_rules_program,
-            auth_rules,
-            authorization_data,
-            None
-        )?;
-        Ok(())
-    }
-     */
-
-
     // purchase an item
     pub fn purchase_item(ctx: Context<PurchaseItem>) -> Result<()> {
         let listing = &ctx.accounts.listing;
 
-        // check that the buyer has enough funds to purchase the item
-        if listing.currency == NATIVE_MINT {
-            require!(ctx.accounts.authority.lamports() > listing.price, YardsaleError::InsufficientFunds);
-            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            // proper account matching listing gets checked in the constraint
+        /*
+        let option_buyer_currency_token: Option<AccountInfo> = match &ctx.accounts.authority_currency_token {
+            Some(token) => Some(token.to_account_info()),
+            None => None
+        };
 
-            // pay for the item with sol
-            invoke(
-                &system_instruction::transfer(
-                    ctx.accounts.authority.key,
-                    &listing.proceeds,
-                    listing.price,
-                ),
-                &[
-                    ctx.accounts.authority.to_account_info().clone(),
-                    ctx.accounts.proceeds.as_ref().unwrap().clone(),
-                    ctx.accounts.system_program.to_account_info().clone(),
-                ],
-            )?;
-        } else {
-            require!(ctx.accounts.authority_currency_token.is_some(), YardsaleError::FundingAccountNotSpecified);
-            require!(ctx.accounts.authority_currency_token.as_ref().unwrap().amount >= listing.price, YardsaleError::InsufficientFunds);
-            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            // proper account matching listing gets checked in the constraint
+        let option_proceeds_token: Option<AccountInfo> = match &ctx.accounts.proceeds_token {
+            Some(token) => Some(token.to_account_info()),
+            None => None
+        };
 
-            // pay for the item with spl token
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.authority_currency_token.as_ref().unwrap().to_account_info(),
-                to: ctx.accounts.proceeds_token.as_ref().unwrap().to_account_info(),
-                authority: ctx.accounts.authority.to_account_info(),
-            };
-            let cpi_program = ctx.accounts.token_program.to_account_info();
-            let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-            token::transfer(cpi_ctx, listing.price)?;
-        }
+        let option_proceeds: Option<AccountInfo> = match &ctx.accounts.proceeds {
+            Some(token) => Some(token.to_account_info()),
+            None => None
+        };
+         */
+
+        make_purchase(
+            listing,
+            &ctx.accounts.authority.to_account_info(),
+            &ctx.accounts.proceeds,
+            &ctx.accounts.proceeds_token,
+            &ctx.accounts.authority_currency_token,
+            &ctx.accounts.system_program,
+            &ctx.accounts.token_program,
+        )?;
 
         let listing_item_token_ai = ctx.accounts.listing_item_token.to_account_info();
         let auth_item_token_ai = ctx.accounts.authority_item_token.to_account_info();
@@ -374,6 +209,7 @@ pub mod yardsale {
         transfer_item_and_close(listing, listing_item_token_ai, auth_item_token_ai, lamports_claimer_ai, token_prog_ai)
 
     }
+
 
     // purchase an item
     pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchasePNFT<'info>>,

@@ -27,14 +27,23 @@ yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 url = "https://api.apr.dev"
 
 [provider]
-#cluster = "localnet"
-cluster = "devnet"
+cluster = "localnet"
+#cluster = "devnet"
 wallet = "~/.config/solana/id.json"
+#wallet = "~/.config/solana/kc-prod.json"
 #wallet = "~/.config/solana/devkey.json"
+
+[[test.genesis]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+program = "./tests/programs/mpl_token_metadata.so"
+
+[[test.genesis]]
+address = "auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg"
+program = "./tests/programs/mpl_token_auth_rules.so"
 
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/pnfts.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/yardsale.ts"
 test-pnfts = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/pnfts.ts"
 #test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/keychkain.ts"
 #test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
