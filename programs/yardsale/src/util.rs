@@ -1,4 +1,6 @@
 use anchor_lang::solana_program::system_instruction;
+use mpl_token_auth_rules::payload::{Payload, PayloadType, SeedsVec};
+use mpl_token_metadata::state::PayloadKey;
 use crate::*;
 
 
@@ -56,7 +58,7 @@ pub fn transfer_item_and_close<'a, 'b>(listing: &Box<Account<'a, Listing>>,
         signer);
     token::transfer(cpi_ctx, 1)?;
 
-    // now we can close the item listing account
+    // now we can close the item listing's token account - we do this in code so we can specify who gets the rent lamports
     let cpi_close_accounts = CloseAccount {
         account: listing_item_token_ai.clone(),
         destination: lamports_claimer_ai.clone(),
@@ -191,7 +193,6 @@ pub fn send_pnft<'info>(
         //passed in below, if needed
     ];
 
-
     let metadata = assert_decode_metadata(nft_mint, &nft_metadata.to_account_info())?;
     if let Some(standard) = metadata.token_standard {
         if standard == TokenStandard::ProgrammableNonFungible {
@@ -206,7 +207,6 @@ pub fn send_pnft<'info>(
             account_infos.push(dest_token_record.to_account_info());
         }
     }
-
 
     //if auth rules passed in, validate & include it in CPI call
     if let Some(config) = metadata.programmable_config {
@@ -256,5 +256,148 @@ pub fn send_pnft<'info>(
         invoke(&transfer_ix, &account_infos)?;
     }
     // invoke(&transfer_ix, &account_infos)?;
+    Ok(())
+}
+
+// transfer a pnft out of a pda
+pub fn tranfer_pnft_from_pda<'info>(
+    listing: &Box<Account<'info, Listing>>,
+    listing_item_token: &Box<Account<'info, TokenAccount>>,
+    buyer: &AccountInfo<'info>,
+    buyer_item_token: &Box<Account<'info, TokenAccount>>,
+    item: &Box<Account<'info, Mint>>,
+    item_metadata: &AccountInfo<'info>,
+    edition: &AccountInfo<'info>,
+    buyer_token_record: &UncheckedAccount<'info>,
+    listing_token_record: &UncheckedAccount<'info>,
+    ruleset: &UncheckedAccount<'info>,
+    authorization_rules_program: &UncheckedAccount<'info>,
+    token_metadata_program: &UncheckedAccount<'info>,
+    instructions: &UncheckedAccount<'info>,
+    token_program: &Program<'info, Token>,
+    associated_token_program: &Program<'info, AssociatedToken>,
+    system_program: &Program<'info, System>,
+) -> Result<()> {
+
+    // /** this auth data isn't necessary for now
+    let seeds = SeedsVec {
+        seeds: vec![listing.item.key().as_ref().to_vec(),
+                    LISTINGS.as_bytes().to_vec(),
+                    listing.keychain.as_bytes().to_vec(),
+                    listing.domain.as_bytes().to_vec(),
+                    YARDSALE.as_bytes().to_vec(),
+        ]
+    };
+
+    let mut payload = Payload::new();
+    payload.insert(PayloadKey::SourceSeeds.to_string(), PayloadType::Seeds(seeds));
+
+    let auth_data = Some(AuthorizationData {
+        payload
+    });
+
+    let transfer_args = TransferArgs::V1 {
+        amount: 1,
+        authorization_data: auth_data
+        // this could be None and still work
+        // authorization_data: None,
+    };
+
+    let mut builder = TransferBuilder::new();
+    builder
+        .authority(listing.key())
+        .token_owner(listing.key())
+        .token(listing_item_token.key())
+        .destination_owner(buyer.key())
+        .destination(buyer_item_token.key())
+        .mint(item.key())
+        .metadata(item_metadata.key())
+        .edition(edition.key())
+        .owner_token_record(listing_token_record.key())
+        .destination_token_record(buyer_token_record.key())
+        // this works without specifying ruleset (guess cause the default gets used?)
+        .authorization_rules(ruleset.key())
+        .authorization_rules_program(authorization_rules_program.key())
+        .payer(buyer.key());
+
+    msg!("building transfer instruction");
+    let build_result = builder.build(transfer_args);
+
+    let instruction = match build_result {
+        Ok(transfer) => {
+            msg!("transfer instruction built");
+            transfer.instruction()
+        }
+        Err(err) => {
+            msg!("Error building transfer instruction: {:?}", err);
+            return Err(YardsaleError::TransferBuilderFailed.into());
+        }
+    };
+
+    let account_infos = [
+        listing.to_account_info(),
+        listing_item_token.to_account_info(),
+        buyer.to_account_info(),
+        buyer_item_token.to_account_info(),
+        item.to_account_info(),
+        item_metadata.to_account_info(),
+        edition.to_account_info(),
+        listing_token_record.to_account_info(),
+        buyer_token_record.to_account_info(),
+        // not sure if this ruleset doesn't need to be specified...
+        ruleset.to_account_info(),
+        listing.to_account_info(),
+        token_metadata_program.to_account_info(),
+        system_program.to_account_info(),
+        instructions.to_account_info(),
+        token_program.to_account_info(),
+        associated_token_program.to_account_info(),
+        authorization_rules_program.to_account_info(),
+    ];
+
+    msg!("invoking transfer instruction");
+
+    let seeds = &[
+        listing.item.as_ref(),
+        LISTINGS.as_bytes().as_ref(),
+        listing.keychain.as_bytes().as_ref(),
+        listing.domain.as_bytes().as_ref(),
+        YARDSALE.as_bytes().as_ref(),
+        &[listing.bump],
+    ];
+    let signer = &[&seeds[..]];
+
+    invoke_signed(&instruction, &account_infos, signer).unwrap();
+
+    Ok(())
+
+}
+
+// close an account owned by the given listing (usually a token account)
+pub fn close_listing_owned_account<'info>(
+    listing: &Box<Account<'info, Listing>>,
+    account_to_close: AccountInfo<'info>,
+    lamports_collector: AccountInfo<'info>,
+    token_prog: &Program<'info, Token>,
+) -> Result<()> {
+
+    let cpi_close_accounts = CloseAccount {
+        account: account_to_close,
+        destination: lamports_collector,
+        authority: listing.to_account_info(),
+    };
+    let signer_seeds = &[
+        listing.item.as_ref(),
+        LISTINGS.as_bytes().as_ref(),
+        listing.keychain.as_bytes().as_ref(),
+        listing.domain.as_bytes().as_ref(),
+        YARDSALE.as_bytes().as_ref(),
+        &[listing.bump],
+    ];
+    let signer = &[&signer_seeds[..]];
+    let cpi_ctx = CpiContext::new_with_signer(token_prog.to_account_info(),
+                                              cpi_close_accounts, signer);
+    token::close_account(cpi_ctx)?;
+
     Ok(())
 }

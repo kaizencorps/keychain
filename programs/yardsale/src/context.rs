@@ -277,6 +277,121 @@ pub struct ListPNFT<'info> {
 }
 
 #[derive(Accounts)]
+pub struct DelistPNFT<'info> {
+
+    #[account(
+        mut,
+        has_one = item,
+        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+        close = seller,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    #[account(
+        constraint = keychain.has_key(&seller.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    pub item: Box<Account<'info, Mint>>,
+
+    // the token account the item gets returned to
+    #[account(
+        mut,
+        token::mint = item,
+        token::authority = seller
+    )]
+    pub seller_item_token: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        associated_token::mint = item,
+        associated_token::authority = listing
+    )]
+    pub listing_item_token: Box<Account<'info, TokenAccount>>,
+
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    /// CHECK: this will be handled by the metaplex code
+    #[account(
+        mut,
+        seeds=[
+            mpl_token_metadata::state::PREFIX.as_bytes(),
+            mpl_token_metadata::id().as_ref(),
+            item.key().as_ref(),
+        ],
+        seeds::program = mpl_token_metadata::id(),
+        bump
+    )]
+    pub item_metadata: AccountInfo<'info>,
+
+    /// CHECK: this will be handled by the metaplex code
+    #[account(
+        mut,
+        seeds=[
+            mpl_token_metadata::state::PREFIX.as_bytes(),
+            mpl_token_metadata::id().as_ref(),
+            item.key().as_ref(),
+            mpl_token_metadata::state::EDITION.as_bytes(),
+        ],
+        seeds::program = mpl_token_metadata::id(),
+        bump
+    )]
+    pub edition: AccountInfo<'info>,
+
+    /// CHECK: seeds below
+    #[account(
+        mut,
+        seeds=[
+            mpl_token_metadata::state::PREFIX.as_bytes(),
+            mpl_token_metadata::id().as_ref(),
+            item.key().as_ref(),
+            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+            seller_item_token.key().as_ref()
+        ],
+        seeds::program = mpl_token_metadata::id(),
+        bump
+    )]
+    pub seller_token_record: UncheckedAccount<'info>,
+
+    /// CHECK: seeds below
+    #[account(
+        mut,
+        seeds=[
+            mpl_token_metadata::state::PREFIX.as_bytes(),
+            mpl_token_metadata::id().as_ref(),
+            item.key().as_ref(),
+            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+            listing_item_token.key().as_ref()
+        ],
+        seeds::program = mpl_token_metadata::id(),
+        bump
+    )]
+    pub listing_token_record: UncheckedAccount<'info>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program <'info, System>,
+
+    /// CHECK: address below
+    #[account(address = mpl_token_auth_rules::id())]
+    pub authorization_rules_program: UncheckedAccount<'info>,
+
+    /// CHECK: address below
+    #[account(address = mpl_token_metadata::id())]
+    pub token_metadata_program: UncheckedAccount<'info>,
+
+    //sysvar ixs don't deserialize in anchor
+    /// CHECK: address below
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions: UncheckedAccount<'info>,
+
+    /// CHECK:
+    #[account()]
+    pub ruleset: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
 pub struct PurchasePNFT<'info> {
 
     #[account(
@@ -420,7 +535,7 @@ pub struct PurchasePNFT<'info> {
 
     /// CHECK:
     #[account()]
-    pub ruleset: Option<UncheckedAccount<'info>>,
+    pub ruleset: UncheckedAccount<'info>,
 }
 
 

@@ -23,5 +23,7 @@ pub enum YardsaleError {
     #[msg("Bad Metadata")]
     BadMetadata,
     #[msg("Bad Ruleset")]
-    BadRuleset
+    BadRuleset,
+    #[msg("TransferBuilder failed")]
+    TransferBuilderFailed
 }
