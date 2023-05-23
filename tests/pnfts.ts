@@ -79,8 +79,8 @@ describe("yardsale pnfts",  () => {
 
   console.log(`--> yardsale program id: ${YardsaleProgram.programId.toBase58()} \n --> keychain program id: ${KeychainProgram.programId.toBase58()}`);
 
-  const pNftTransferClient = new PnftHelper(provider.connection, provider.wallet as anchor.Wallet)
-  pNftTransferClient.setProgram();
+  const pnftHelper = new PnftHelper(provider.connection, provider.wallet as anchor.Wallet)
+  pnftHelper.setProgram();
 
   let userKeychainPda: PublicKey;
   let domainPda: PublicKey;
@@ -111,7 +111,7 @@ describe("yardsale pnfts",  () => {
     console.log(`provider url: ${provider.connection.rpcEndpoint}`);
 
     // create a few pNFTs
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < 3; i++) {
       const pnftMint = await createpNFT(provider);
       console.log(`created pNFT: ${pnftMint.toBase58()}`);
       pnfts.push(pnftMint);
@@ -191,7 +191,7 @@ describe("yardsale pnfts",  () => {
     expect(tokenBalance.value.uiAmount).to.equal(1);
 
     let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
-    builder = await pNftTransferClient.buildListPNFT(price, {
+    builder = await pnftHelper.buildListPNFT(price, {
       domain: domainPda,
       keychain: userKeychainPda,
       item: pnft,
@@ -226,7 +226,7 @@ describe("yardsale pnfts",  () => {
 
 
     ///// now let's buy this guy
-    builder = await pNftTransferClient.buildPurchasePNFT({
+    builder = await pnftHelper.buildPurchasePNFT({
       item: pnft,
       listing: listingPda,
       currency: NATIVE_MINT,
@@ -270,7 +270,87 @@ describe("yardsale pnfts",  () => {
     expect(accountInfo).to.be.null;
     accountInfo = await connection.getAccountInfo(listingPda);
     expect(accountInfo).to.be.null;
+  });
 
+  it("delist a pNFT", async () => {
+
+    // the pnft to delist
+    let pnft = pnfts[1];
+
+    // user's nft token account
+    let fromItemToken = getAssociatedTokenAddressSync(pnft, provider.wallet.publicKey);
+    let [listingPda] = findListingPda(pnft, username, domain, YardsaleProgram.programId);
+    // listing's ata
+    let listingItemToken = getAssociatedTokenAddressSync(pnft, listingPda, true);
+
+    // first: list the item
+
+    let sellerItemToken = getAssociatedTokenAddressSync(pnft, provider.wallet.publicKey);
+    let tokenBalance = await provider.connection.getTokenAccountBalance(sellerItemToken);
+    expect(tokenBalance.value.uiAmount).to.equal(1);
+
+    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
+    builder = await pnftHelper.buildListPNFT(price, {
+      domain: domainPda,
+      keychain: userKeychainPda,
+      item: pnft,
+      listing: listingPda,
+      currency: NATIVE_MINT,
+      proceeds: proceedsAccount.publicKey,
+      proceedsToken: null,
+      listingItemToken,
+      seller: provider.wallet.publicKey
+    });
+
+    tx = new Transaction().add(await builder.instruction());
+
+    txid = await provider.sendAndConfirm(tx);
+
+    console.log(`listed pNFT ${pnft.toBase58()} in tx: ${txid}`);
+    console.log(`creatorItemToken: ${sellerItemToken.toBase58()}`);
+    console.log(`listingPda: ${listingPda.toBase58()} \nlistingItemToken: ${listingItemToken.toBase58()}`);
+
+    // check that the pnft got transferred to the listing ata
+    tokenBalance = await connection.getTokenAccountBalance(listingItemToken);
+    expect(tokenBalance.value.uiAmount).to.equal(1);
+    tokenBalance = await connection.getTokenAccountBalance(sellerItemToken);
+    expect(tokenBalance.value.uiAmount).to.equal(0);
+
+
+    console.log(`---------- delisting ------------ `);
+
+    const listingAcct = await YardsaleProgram.account.listing.fetch(listingPda);
+    console.log(`listing account: ${listingPda.toString()}`, listingAcct);
+
+    ///// now let's delist this guy
+    builder = await pnftHelper.buildDelistPNFT({
+      keychain: userKeychainPda,
+      item: pnft,
+      listing: listingPda,
+      listingItemToken,
+      seller: provider.wallet.publicKey,
+      ruleset: DEFAULT_RULESET
+    });
+
+    // need to create the buyer's ata first
+    // /*
+    tx = new Transaction();
+    tx = tx.add(await builder.instruction());
+
+    txid = await provider.sendAndConfirm(tx);
+
+    console.log(`---------- delisted! ------------ `);
+    console.log(`delisted pNFT ${pnft.toBase58()} in tx: ${txid}`);
+
+    // check that the pnft got transferred back to the seller
+    tokenBalance = await connection.getTokenAccountBalance(sellerItemToken);
+    expect(tokenBalance.value.uiAmount).to.equal(1);
+
+    // check that the listing and listing_token accounts got closed
+    let accountInfo = await connection.getAccountInfo(listingItemToken);
+    expect(accountInfo).to.be.null;
+    accountInfo = await connection.getAccountInfo(listingPda);
+    expect(accountInfo).to.be.null;
 
   });
 
