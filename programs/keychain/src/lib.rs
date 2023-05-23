@@ -52,7 +52,7 @@ pub mod keychain {
         domain.key_cost = key_cost;
         domain.treasury = *ctx.accounts.treasury.key;
         domain.bump = *ctx.bumps.get("domain").unwrap();
-        domain.keychain_action_threshold = CURRENT_KEYCHAIN_VERSION;
+        domain.keychain_action_threshold = DEFAULT_DOMAIN_KEYCHAIN_ACTION_THRESHOLD;
 
         msg!("created domain account: {}", ctx.accounts.domain.key());
         Ok(())
@@ -186,35 +186,41 @@ pub mod keychain {
         let keychain = &mut ctx.accounts.keychain;
         let signer = *ctx.accounts.authority.to_account_info().key;
 
-        set_vote(keychain, &mut ctx.accounts.keychain_state, &signer, vote);
-
-        let action_threshold = ctx.accounts.keychain_state.action_threshold;
-        let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
-
-        if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
-            (u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
-
-            // perform the pending action
-            match pending_action.action_type {
-                KeyChainActionType::AddKey => {
-                    // make sure the key has been verified - this makes sure the keychain_key account exists
-                    require!(pending_action.verified, KeychainError::KeyNotVerified);
-                    // add the key
-                    keychain.add_key(pending_action.key);
-                },
-                KeyChainActionType::RemoveKey => {
-                    // remove the key - in this case we need to have been passed in the keychain_key account
-                    require!(ctx.accounts.keychain_key.is_some(), KeychainError::MissingKeyAccount);
-                    keychain.remove_key(pending_action.key);
-
-                    // close the keychain_key account - send lamports back to the signer
-                    let keychain_key = ctx.accounts.keychain_key.as_mut().unwrap();
-                    keychain_key.close(ctx.accounts.authority.to_account_info())?;
-                },
-            }
-
+        // a single rejection will cancel the pending action
+        if !vote {
             // clear the pending action
             ctx.accounts.keychain_state.pending_action = None;
+        } else {
+            set_vote(keychain, &mut ctx.accounts.keychain_state, &signer, vote);
+
+            let action_threshold = ctx.accounts.keychain_state.action_threshold;
+            let pending_action = ctx.accounts.keychain_state.pending_action.as_mut().unwrap();
+
+            if (action_threshold > 0 && pending_action.votes.count_set() >= action_threshold) ||
+                (u16::from(pending_action.votes.count_set()) == keychain.num_keys) {
+
+                // perform the pending action
+                match pending_action.action_type {
+                    KeyChainActionType::AddKey => {
+                        // make sure the key has been verified - this makes sure the keychain_key account exists
+                        require!(pending_action.verified, KeychainError::KeyNotVerified);
+                        // add the key
+                        keychain.add_key(pending_action.key);
+                    },
+                    KeyChainActionType::RemoveKey => {
+                        // remove the key - in this case we need to have been passed in the keychain_key account
+                        require!(ctx.accounts.keychain_key.is_some(), KeychainError::MissingKeyAccount);
+                        keychain.remove_key(pending_action.key);
+
+                        // close the keychain_key account - send lamports back to the signer
+                        let keychain_key = ctx.accounts.keychain_key.as_mut().unwrap();
+                        keychain_key.close(ctx.accounts.authority.to_account_info())?;
+                    },
+                }
+
+                // clear the pending action
+                ctx.accounts.keychain_state.pending_action = None;
+            }
         }
 
         Ok(())

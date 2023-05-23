@@ -11,20 +11,20 @@ use crate::error::*;
 pub struct CreateDomain<'info> {
     // space: 8 discriminator + size(Domain) = 40 +
     #[account(
-    init,
-    payer = authority,
-    seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + CurrentDomain::MAX_SIZE,
+        init,
+        payer = authority,
+        seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + CurrentDomain::MAX_SIZE,
     )]
     pub domain: Box<Account<'info, CurrentDomain>>,
 
     #[account(
-    init,
-    payer = authority,
-    seeds = [DOMAIN_STATE.as_bytes().as_ref(), name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + DomainState::MAX_SIZE,
+        init,
+        payer = authority,
+        seeds = [DOMAIN_STATE.as_bytes().as_ref(), name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + DomainState::MAX_SIZE,
     )]
     pub domain_state: Box<Account<'info, DomainState>>,
 
@@ -66,29 +66,29 @@ pub struct CreateKeychain<'info> {
 
     // space: 8 discriminator + KeyChain::MAX_SIZE
     #[account(
-    init,
-    payer = authority,
-    seeds = [keychain_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + CurrentKeyChain::MAX_SIZE
+        init,
+        payer = authority,
+        seeds = [keychain_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + CurrentKeyChain::MAX_SIZE
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
     #[account(
-    init,
-    payer = authority,
-    seeds = [keychain.key().as_ref(), KEYCHAIN_STATE_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + KeyChainState::MAX_SIZE
+        init,
+        payer = authority,
+        seeds = [keychain.key().as_ref(), KEYCHAIN_STATE_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + KeyChainState::MAX_SIZE
     )]
     pub keychain_state: Box<Account<'info, KeyChainState>>,
 
     #[account(
-    init,
-    payer = authority,
-    seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + KeyChainKey::MAX_SIZE
+        init,
+        payer = authority,
+        seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + KeyChainKey::MAX_SIZE
     )]
     // the first key on this keychain
     pub keychain_key: Box<Account<'info, KeyChainKey>>,
@@ -185,9 +185,9 @@ pub struct VotePendingAction<'info> {
 
     // this is required if the pending action is a key removal
     #[account(
-    seeds = [keychain_state.pending_action.as_ref().unwrap().key.as_ref(), KEY_SPACE.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    mut,
+        mut,
+        seeds = [keychain_state.pending_action.as_ref().unwrap().key.as_ref(), KEY_SPACE.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
     )]
     pub keychain_key: Option<Account<'info, KeyChainKey>>,
 
@@ -210,11 +210,11 @@ pub struct VerifyKey<'info> {
 
     // the key account gets created here
     #[account(
-    init,
-    payer = authority,
-    seeds = [&authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + (32 * 2)
+        init,
+        payer = authority,
+        seeds = [&authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + (32 * 2)
     )]
     pub keychain_key: Box<Account<'info, KeyChainKey>>,
 
@@ -244,9 +244,9 @@ pub struct RemoveKey<'info> {
     // the key account that will need to be removed
     // we close manually instead of using the close attribute since an unverified key won't have the corresponding account
     #[account(
-    seeds = [key.as_ref(), KEY_SPACE.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    mut,
+        mut,
+        seeds = [key.as_ref(), KEY_SPACE.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
     )]
     pub keychain_key: Box<Account<'info, KeyChainKey>>,
 

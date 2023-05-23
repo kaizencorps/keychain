@@ -17,5 +17,5 @@ pub const CURRENT_DOMAIN_VERSION: u8 = 1;
 
 pub const DEFAULT_DOMAIN_KEYCHAIN_ACTION_THRESHOLD: u8 = 2;
 
-// allow up to 3 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
+// allow up to 5 wallets for now - 2 num_keys + 4 vector + (space(T) * amount)
 pub const MAX_KEYS: usize = 5;
