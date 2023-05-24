@@ -4,26 +4,63 @@ skip-lint = false
 
 [programs.localnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
-keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+#keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
+yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 
 [programs.devnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
-keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+#keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
+yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 
 [programs.mainnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
-keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+#keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
+keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
+yardsale = "dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "localnet"
+#cluster = "devnet"
 wallet = "~/.config/solana/id.json"
+#wallet = "~/.config/solana/kc-prod.json"
+#wallet = "~/.config/solana/devkey.json"
+
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+# clone the metaplex programs from mainnet
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+
+[[test.validator.clone]]
+address = "auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg"
+
+# clone the metaplex default rules
+[[test.validator.clone]]
+address = "eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9"
+
+#[[test.genesis]]
+#address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+#program = "./tests/programs/mpl_token_metadata.so"
+
+#[[test.genesis]]
+#address = "auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg"
+#program = "./tests/programs/mpl_token_auth_rules.so"
+
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+#test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/yardsale.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/pnfts.ts"
+#test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/keychkain.ts"
+#test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+#test-keychain = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/keychain.ts"
+#test-yardsale = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/yardsale.ts"
 

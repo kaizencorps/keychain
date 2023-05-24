@@ -1,21 +1,25 @@
 [package]
-name = "profile"
+name = "yardsale"
 version = "0.1.0"
 description = "Created with Anchor"
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "profile"
+name = "yardsale"
 
 [features]
 no-entrypoint = []
 no-idl = []
+no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
 anchor-lang = "0.27.0"
 anchor-spl = "0.27.0"
-clockwork-sdk = { version = "1.4.2" }
+spl-token = "3.5.0"
+spl-associated-token-account = "1.1.2"
+mpl-token-auth-rules = "1.3.0"
+mpl-token-metadata = { version = "1.11.0", features = ["no-entrypoint"] }
 keychain = { path = "../keychain", features = ["cpi"] }

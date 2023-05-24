@@ -11,21 +11,23 @@ use crate::error::*;
 pub struct CreateDomain<'info> {
     // space: 8 discriminator + size(Domain) = 40 +
     #[account(
-    init,
-    payer = authority,
-    seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + CurrentDomain::MAX_SIZE,
+        init,
+        payer = authority,
+        seeds = [name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + CurrentDomain::MAX_SIZE,
     )]
-    pub domain: Account<'info, CurrentDomain>,
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
     #[account(
-    init,
-    payer = authority,
-    seeds = [DOMAIN_STATE.as_bytes().as_ref(), name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + DomainState::MAX_SIZE,
+        init,
+        payer = authority,
+        seeds = [DOMAIN_STATE.as_bytes().as_ref(), name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + DomainState::MAX_SIZE,
     )]
-    pub domain_state: Account<'info, DomainState>,
+    pub domain_state: Box<Account<'info, DomainState>>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program <'info, System>,
@@ -36,7 +38,7 @@ pub struct CreateDomain<'info> {
     pub treasury: AccountInfo<'info>,
 }
 
-// used to destroy a Domain, keychain, or whatever account
+// used to destroy a Domain, keychain, key or whatever keychain-owned account we want. note: use with extreme caution
 
 #[derive(Accounts)]
 pub struct CloseAccount<'info> {
@@ -56,50 +58,58 @@ pub struct CloseAccount<'info> {
 
     #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
     pub program_data: Account<'info, ProgramData>,
-    // system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 #[instruction(keychain_name: String)]
 pub struct CreateKeychain<'info> {
+
     // space: 8 discriminator + KeyChain::MAX_SIZE
     #[account(
-    init,
-    payer = authority,
-    seeds = [keychain_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + CurrentKeyChain::MAX_SIZE
+        init,
+        payer = authority,
+        seeds = [keychain_name.as_bytes().as_ref(), KEYCHAIN_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + CurrentKeyChain::MAX_SIZE
     )]
-    pub keychain: Account<'info, CurrentKeyChain>,
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
     #[account(
-    init,
-    payer = authority,
-    seeds = [keychain.key().as_ref(), KEYCHAIN_STATE_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + KeyChainState::MAX_SIZE
+        init,
+        payer = authority,
+        seeds = [keychain.key().as_ref(), KEYCHAIN_STATE_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + KeyChainState::MAX_SIZE
     )]
-    pub keychain_state: Account<'info, KeyChainState>,
+    pub keychain_state: Box<Account<'info, KeyChainState>>,
+
     #[account(
-    init,
-    payer = authority,
-    seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + KeyChainKey::MAX_SIZE
+        init,
+        payer = authority,
+        seeds = [wallet.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + KeyChainKey::MAX_SIZE
     )]
     // the first key on this keychain
-    pub key: Account<'info, KeyChainKey>,
+    pub keychain_key: Box<Account<'info, KeyChainKey>>,
+
     #[account()]
-    pub domain: Account<'info, CurrentDomain>,
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub wallet: AccountInfo<'info>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
+
     pub system_program: Program <'info, System>,
 }
 
+// just for testing - only super-admin can call this
 #[derive(Accounts)]
 #[instruction(keychain_name: String)]
 pub struct CreateKeychainV1<'info> {
+
     // space: 8 discriminator + KeyChain::MAX_SIZE
     #[account(
     init,
@@ -108,7 +118,8 @@ pub struct CreateKeychainV1<'info> {
     bump,
     space = 8 + KeyChainV1::MAX_SIZE
     )]
-    pub keychain: Account<'info, KeyChainV1>,
+    pub keychain: Box<Account<'info, KeyChainV1>>,
+
     #[account(
     init,
     payer = authority,
@@ -116,7 +127,8 @@ pub struct CreateKeychainV1<'info> {
     bump,
     space = 8 + KeyChainState::MAX_SIZE
     )]
-    pub keychain_state: Account<'info, KeyChainState>,
+    pub keychain_state: Box<Account<'info, KeyChainState>>,
+
     #[account(
     init,
     payer = authority,
@@ -125,136 +137,129 @@ pub struct CreateKeychainV1<'info> {
     space = 8 + KeyChainKey::MAX_SIZE
     )]
     // the first key on this keychain
-    pub key: Account<'info, KeyChainKey>,
+    pub key: Box<Account<'info, KeyChainKey>>,
+
     #[account()]
-    pub domain: Account<'info, CurrentDomain>,
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub wallet: AccountInfo<'info>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
+
     pub system_program: Program <'info, System>,
+
+    // only super-admin can call this (it's for testing)
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, Keychain>,
+
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()))]
+    pub program_data: Account<'info, ProgramData>,
 }
 
-// for now let anyone call this method
 #[derive(Accounts)]
-pub struct UpgradeKeyChain<'info> {
+#[instruction(key: Pubkey)]
+pub struct AddKey<'info> {
 
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    /// CHECK:
-    #[account(mut)]
-    pub keychain: AccountInfo<'info,>,
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::NotAuthorized)]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
     #[account(mut, has_one = keychain)]
-    pub keychain_state: Account<'info, KeyChainState>,
+    pub keychain_state: Box<Account<'info, KeyChainState>>,
 
-    pub system_program: Program <'info, System>,
-
-}
-
-/*
-#[derive(Accounts)]
-pub struct UpgradeOldKeyChain<'info> {
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    // reallocate size to include room for the name + state info (verison)
-    /// CHECK:
-    #[account(
-    mut,
-    realloc = 1 + 32 + 2 + 32 + (4 + (MAX_KEYS * 33)),
-    realloc::payer = user,
-    realloc::zero = true
-    )]
-    pub keychain: Account<'info, OldKeyChain>,
-    pub system_program: Program <'info, System>,
-}
- */
-
-#[derive(Accounts)]
-#[instruction(pubkey: Pubkey)]
-pub struct AddKey<'info> {
-    #[account(mut)]
-    pub keychain: Account<'info, CurrentKeyChain>,
-
-    // -- this doesn't work cause anchor expects a passed in account to be initialized
-    // this gets passed in but NOT initialized - just checked for existence
-    // key: Account<'info, KeyChainKey>,
-
-    /// CHECK: just reading
-    #[account()]
-    pub domain: Account<'info, CurrentDomain>,
-
-    // this needs to be an existing (and verified) UserKey in the keychain
-    #[account(mut)]
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::NotAuthorized)]
     pub authority: Signer<'info>,
+
+}
+
+#[derive(Accounts)]
+pub struct VotePendingAction<'info> {
+
+    // check that the key being verified has already been added to the keychain & check auth on the authority below
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::KeyNotFound)]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(mut, has_one = keychain, constraint = keychain_state.has_pending_action() @ KeychainError::NoPendingAction)]
+    pub keychain_state: Box<Account<'info, KeyChainState>>,
+
+    // this is required if the pending action is a key removal
+    #[account(
+        mut,
+        seeds = [keychain_state.pending_action.as_ref().unwrap().key.as_ref(), KEY_SPACE.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+    )]
+    pub keychain_key: Option<Account<'info, KeyChainKey>>,
+
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::NotAuthorized)]
+    pub authority: Signer<'info>,
+
 }
 
 #[derive(Accounts)]
 pub struct VerifyKey<'info> {
+
+    #[account(has_one = treasury @KeychainError::InvalidTreasury)]
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
     #[account(mut)]
-    pub keychain: Account<'info, CurrentKeyChain>,
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(mut, has_one = keychain, constraint = keychain_state.has_pending_action_type(KeyChainActionType::AddKey) @ KeychainError::NoPendingAction)]
+    pub keychain_state: Box<Account<'info, KeyChainState>>,
 
     // the key account gets created here
     #[account(
-    init,
-    payer = authority,
-    seeds = [user_key.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    space = 8 + (32 * 2)
+        init,
+        payer = authority,
+        seeds = [&authority.key().as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
+        space = 8 + (32 * 2)
     )]
-    pub key: Account<'info, KeyChainKey>,
+    pub keychain_key: Box<Account<'info, KeyChainKey>>,
 
-    /// CHECK: user's wallet, gets checked against corresponding key in keychain
-    // this needs to be a UserKey on the keychain
-    #[account(constraint = keychain.has_key(&user_key.key()))]
-    pub user_key: AccountInfo<'info>,
-
-    // will just be same as user_key unless it's the domain admin
-    #[account(mut)]
+    // check that the signer is the pending key
+    #[account(mut, constraint = keychain_state.has_pending_action_key(&authority.key()) @ KeychainError::InvalidVerifier)]
     pub authority: Signer<'info>,
 
-    #[account(constraint = domain.treasury == treasury.key() @ KeychainError::WrongTreasury)]
-    pub domain: Account<'info, CurrentDomain>,
-
-    /// CHECK: gets checked by domain constraint
-    #[account(mut, address = domain.treasury)]
+    /// CHECK: just sending lamports
+    #[account(mut, address = domain.treasury, constraint = treasury.key() == domain.treasury @ KeychainError::InvalidTreasury)]
     pub treasury: AccountInfo<'info>,
 
     pub system_program: Program <'info, System>,
 }
 
 #[derive(Accounts)]
-#[instruction(pubkey: Pubkey)]
+#[instruction(key: Pubkey)]
 pub struct RemoveKey<'info> {
-    #[account(mut)]
-    pub keychain: Account<'info, CurrentKeyChain>,
+
+    // make sure the key we're removing exists on the keychain
+    #[account(mut, constraint = keychain.has_key(&key) @ KeychainError::KeyNotFound)]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    // include the state in case the keychain is closed; make sure there's no pending action
+    #[account(mut, has_one = keychain, constraint = !keychain_state.has_pending_action() @ KeychainError::PendingActionExists)]
+    pub keychain_state: Box<Account<'info, KeyChainState>>,
 
     // the key account that will need to be removed
     // we close manually instead of using the close attribute since an unverified key won't have the corresponding account
     #[account(
-    seeds = [pubkey.as_ref(), KEY_SPACE.as_bytes().as_ref(), domain.name.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
-    bump,
-    mut,
+        mut,
+        seeds = [key.as_ref(), KEY_SPACE.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), KEYCHAIN.as_bytes().as_ref()],
+        bump,
     )]
-    // pub key: Account<'info, KeyChainKey>,
-    pub key: Option<Account<'info, KeyChainKey>>,
+    pub keychain_key: Box<Account<'info, KeyChainKey>>,
 
-     // include the state in case the keychain is closed
-    #[account(mut, has_one = keychain)]
-    pub keychain_state: Account<'info, KeyChainState>,
-
-    // #[account(has_one = treasury)]
-    #[account(constraint = domain.treasury == treasury.key() @ KeychainError::WrongTreasury)]
-    pub domain: Account<'info, CurrentDomain>,
-
-    // this needs to be an existing (and verified) UserKey in the keychain
-    #[account(mut)]
+    #[account(mut, constraint = keychain.has_key(&authority.key()) @ KeychainError::NotAuthorized)]
     pub authority: Signer<'info>,
 
-    /// CHECK: gets checked by domain constraint
-    #[account(mut, address = domain.treasury)]
+    /*
+    // #[account(has_one = treasury OR constraint = domain.treasury == treasury.key() @ KeychainError::InvalidTreasury)]
+    #[account()]
+    pub domain: Account<'info, CurrentDomain>,
+
+    /// CHECK: just sending lamports
+    #[account(mut, address = domain.treasury, constraint = treasury.key() == domain.treasury @ KeychainError::InvalidTreasury)]
     pub treasury: AccountInfo<'info>
+     */
 }
