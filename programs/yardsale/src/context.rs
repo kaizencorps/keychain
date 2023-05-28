@@ -274,6 +274,7 @@ pub struct ListPNFT<'info> {
     #[account(address = mpl_token_auth_rules::id())]
     pub authorization_rules_program: UncheckedAccount<'info>,
 
+    // ruleset is passed in w/remaining accounts
 }
 
 #[derive(Accounts)]
@@ -387,8 +388,8 @@ pub struct DelistPNFT<'info> {
     pub instructions: UncheckedAccount<'info>,
 
     /// CHECK:
-    #[account()]
-    pub ruleset: UncheckedAccount<'info>,
+    #[account(owner = mpl_token_auth_rules::id())]
+    pub ruleset: Option<UncheckedAccount<'info>>,
 }
 
 #[derive(Accounts)]
@@ -534,8 +535,8 @@ pub struct PurchasePNFT<'info> {
     pub instructions: UncheckedAccount<'info>,
 
     /// CHECK:
-    #[account()]
-    pub ruleset: UncheckedAccount<'info>,
+    #[account(owner = mpl_token_auth_rules::id())]
+    pub ruleset: Option<UncheckedAccount<'info>>,
 }
 
 

@@ -270,7 +270,7 @@ pub fn tranfer_pnft_from_pda<'info>(
     edition: &AccountInfo<'info>,
     buyer_token_record: &UncheckedAccount<'info>,
     listing_token_record: &UncheckedAccount<'info>,
-    ruleset: &UncheckedAccount<'info>,
+    ruleset: &Option<UncheckedAccount<'info>>,
     authorization_rules_program: &UncheckedAccount<'info>,
     token_metadata_program: &UncheckedAccount<'info>,
     instructions: &UncheckedAccount<'info>,
@@ -315,10 +315,18 @@ pub fn tranfer_pnft_from_pda<'info>(
         .edition(edition.key())
         .owner_token_record(listing_token_record.key())
         .destination_token_record(buyer_token_record.key())
-        // this works without specifying ruleset (guess cause the default gets used?)
-        .authorization_rules(ruleset.key())
         .authorization_rules_program(authorization_rules_program.key())
         .payer(buyer.key());
+
+    // ruleset is optional
+    let ruleset_account_info;
+    if let Some(ruleset) = ruleset {
+        builder.authorization_rules(ruleset.key());
+        ruleset_account_info = ruleset.to_account_info();
+    } else {
+        // per pnft guide, set the ruleset to the token metadata program if it's not provided/needed
+        ruleset_account_info = token_metadata_program.to_account_info();
+    }
 
     msg!("building transfer instruction");
     let build_result = builder.build(transfer_args);
@@ -334,6 +342,8 @@ pub fn tranfer_pnft_from_pda<'info>(
         }
     };
 
+    // these SHOULD be the transfer instructions but the ordering is based on the
+    // rooster program, and DOESN"T match the order of the transfer instructions in the tm program
     let account_infos = [
         listing.to_account_info(),
         listing_item_token.to_account_info(),
@@ -344,8 +354,7 @@ pub fn tranfer_pnft_from_pda<'info>(
         edition.to_account_info(),
         listing_token_record.to_account_info(),
         buyer_token_record.to_account_info(),
-        // not sure if this ruleset doesn't need to be specified...
-        ruleset.to_account_info(),
+        ruleset_account_info,
         listing.to_account_info(),
         token_metadata_program.to_account_info(),
         system_program.to_account_info(),
