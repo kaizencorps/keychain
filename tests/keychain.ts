@@ -3,7 +3,7 @@ import {AnchorProvider, Program, Wallet} from "@project-serum/anchor";
 import { Keychain } from "../target/types/keychain";
 import { Profile } from "../target/types/profile";
 import * as assert from "assert";
-import {Keypair, PublicKey, sendAndConfirmTransaction, Transaction} from "@solana/web3.js";
+import {Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Transaction} from "@solana/web3.js";
 import {createAssociatedTokenAccount, createMint, mintToChecked} from "@solana/spl-token";
 import {
   createNFTMint,
@@ -61,6 +61,7 @@ describe("keychain", () => {
     const key2 = anchor.web3.Keypair.generate();
     // 3rd wallet/key
     const key3 = anchor.web3.Keypair.generate();
+    const key4 = anchor.web3.Keypair.generate();
 
     console.log("program id: ", keychainProgram.programId.toBase58());
 
@@ -76,6 +77,7 @@ describe("keychain", () => {
 
     const [key2KeyPda, key2KeyPdaBump] = findKeychainKeyPda(key2.publicKey, domain, keychainProgram.programId);
     const [key3KeyPda, key3KeyPdaBump] = findKeychainKeyPda(key3.publicKey, domain, keychainProgram.programId);
+    const [key4KeyPda, key4KeyPdaBump] = findKeychainKeyPda(key4.publicKey, domain, keychainProgram.programId);
     const [adminPlayerKeychainPda, adminPlayerKeychainPdaBump] = findKeychainPda(adminPlayername, domain, keychainProgram.programId);
 
     console.log(`domain: ${domain}`);
@@ -85,10 +87,6 @@ describe("keychain", () => {
     console.log(`player keychain pda: ${playerKeychainPda.toBase58()}`);
     console.log(`admin player keychain pda: ${adminPlayerKeychainPda.toBase58()}`);
     console.log(`keychain program ID: ${keychainProgram.programId.toBase58()}`);
-
-    // we'll use these later
-    let nftMint: Keypair = null;
-    let nftAccount: PublicKey = null;
 
     it('sets up the test', async () => {
         // airdrop some sol to the random key's wallet + the 2nd key we're adding
@@ -104,27 +102,41 @@ describe("keychain", () => {
             await provider.connection.requestAirdrop(key3.publicKey, anchor.web3.LAMPORTS_PER_SOL * 0.5),
             "confirmed"
         );
+        await provider.connection.confirmTransaction(
+            await provider.connection.requestAirdrop(key4.publicKey, anchor.web3.LAMPORTS_PER_SOL * 0.5),
+            "confirmed"
+        );
 
-        // create a fake nft
-        nftMint = await createNFTMint(provider.connection, key2, key2.publicKey);
-        console.log('created nft mint: ', nftMint.publicKey.toBase58());
-        nftAccount = await createAssociatedTokenAccount(
-            provider.connection, // connection
-            key2, // fee payer
-            nftMint.publicKey, // mint
-            key2.publicKey // owner,
-        );
-        // mint the nft
-        let txhash = await mintToChecked(
-            provider.connection, // connection
-            key2, // fee payer
-            nftMint.publicKey, // mint
-            nftAccount, // receiver (sholud be a token account)
-            key2, // mint authority
-            1, // amount. if your decimals is 8, you mint 10^8 for 1 token.
-            0 // decimals
-        );
-        console.log('minted nft in tx: ', txhash);
+
+      /* if on devnet
+      let tx = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: provider.wallet.publicKey,
+            // toPubkey: buyer.publicKey, // create a random receiver
+            toPubkey: randomPlayerKeypair.publicKey, // create a random receiver
+            lamports: 0.2 * LAMPORTS_PER_SOL,
+          }),
+          SystemProgram.transfer({
+            fromPubkey: provider.wallet.publicKey,
+            // toPubkey: buyer.publicKey, // create a random receiver
+            toPubkey: key2.publicKey, // create a random receiver
+            lamports: 0.2 * LAMPORTS_PER_SOL,
+          }),
+          SystemProgram.transfer({
+            fromPubkey: provider.wallet.publicKey,
+            // toPubkey: buyer.publicKey, // create a random receiver
+            toPubkey: key3.publicKey, // create a random receiver
+            lamports: 0.2 * LAMPORTS_PER_SOL,
+          }),
+          SystemProgram.transfer({
+            fromPubkey: provider.wallet.publicKey,
+            // toPubkey: buyer.publicKey, // create a random receiver
+            toPubkey: key4.publicKey, // create a random receiver
+            lamports: 0.2 * LAMPORTS_PER_SOL,
+          }),
+      );
+      await provider.sendAndConfirm(tx);
+       */
 
     });
 
@@ -336,12 +348,6 @@ describe("keychain", () => {
 
       // now the key2 account needs to verify
 
-      const provider2 = new AnchorProvider(
-          provider.connection,
-          new Wallet(key2),
-          {}
-      );
-
       txid = await keychainProgram.methods.verifyKey().accounts({
           domain: domainPda,
           keychain: playerKeychainPda,
@@ -368,6 +374,7 @@ describe("keychain", () => {
       console.log('-- keys: ', keychain.keys);
       console.log('-- key 1 address: ', keychain.keys[0].key.toBase58());
       console.log('-- key 1: ', keychain.keys[0].key);
+      assert.ok(keychain.keys.length == 2, '1 key shouldve been added');
       if (keychain.keys.length > 1) {
         console.log('-- key 2 address: ', keychain.keys[1].key.toBase58());
         console.log('-- key 2: ', keychain.keys[1].key);
@@ -423,7 +430,7 @@ describe("keychain", () => {
         await randomPlayerProgram.methods.votePendingAction(true).accounts({
             keychain: playerKeychainPda,
             keychainState: playerKeychainStatePda,
-            keychainKey: key3KeyPda,
+            keychainKey: null,
             authority: key2.publicKey,
         }).signers([key2]).rpc();
 
@@ -435,7 +442,7 @@ describe("keychain", () => {
         await randomPlayerProgram.methods.votePendingAction(true).accounts({
           keychain: playerKeychainPda,
           keychainState: playerKeychainStatePda,
-          keychainKey: key3KeyPda,
+          keychainKey: null,
           authority: randomPlayerKeypair.publicKey,
         }).rpc();
 
@@ -448,7 +455,7 @@ describe("keychain", () => {
         assert.ok(keychain.keys.length == 3, '3rd key added');
       });
 
-  it("removes a key from the keychain", async () => {
+  it("key removes itself from the keychain", async () => {
       let keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
       console.log(`numkeys: ${keychain.numKeys}`);
       console.log(`keys length: ${keychain.keys.length}`);
@@ -456,7 +463,7 @@ describe("keychain", () => {
           console.log(`--key ${x}: ${keychain.keys[x].key.toBase58()}`);
       }
 
-      // we'll remove the original key (simulate it potentially being a custodial key)
+      // the original key  will remove itself (simulate it potentially being a custodial key)
       await randomPlayerProgram.rpc.removeKey(randomPlayerKeypair.publicKey, {
           accounts: {
               keychain: playerKeychainPda,
@@ -496,7 +503,173 @@ describe("keychain", () => {
       assert.ok(keychain.keys.length == 2, 'should only be 2 key on the keychain');
   });
 
-  it("closes an empty keychain account", async () => {
+      it("cancels a pending add", async () => {
+        const key5 = anchor.web3.Keypair.generate();
+
+        // we'll use key2 to add key5
+        let txid = await randomPlayerProgram.methods.addKey(key5.publicKey).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          authority: key2.publicKey,
+        }).signers([key2]).rpc();
+
+        // now we approve w/key3 - so all approvals are in, but not verified yet
+        await randomPlayerProgram.methods.votePendingAction(true).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: null,
+          authority: key3.publicKey,
+        }).signers([key3]).rpc();
+
+        // now we cancel with key2
+        await randomPlayerProgram.methods.votePendingAction(false).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: null,
+          authority: key2.publicKey,
+        }).signers([key2]).rpc();
+
+        // keychain state will no longer have a pending action
+        let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        expect(keychainState.pendingAction).to.be.null;
+
+        // should still be 2 keys
+        let keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
+        assert.ok(keychain.keys.length == 2, 'canceled add, so should still be 2 keys');
+      });
+
+      it("Adds ANOTHER key to the keychain, this time approves it THEN verifies", async () => {
+        let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
+        console.log("treasury balance before adding 3rd key: ", treasuryBalance);
+
+        // we'll use key2 to add key4
+        let txid = await randomPlayerProgram.methods.addKey(key4.publicKey).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          authority: key2.publicKey,
+        }).signers([key2]).rpc();
+
+        console.log(`added key ${key4.publicKey.toBase58()} to keychain: ${txid}`);
+
+        // now we approve w/key3
+        await randomPlayerProgram.methods.votePendingAction(true).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: null,
+          authority: key3.publicKey,
+        }).signers([key3]).rpc();
+
+        console.log(`approved key ${key4.publicKey.toBase58()} with key ${key3.publicKey.toBase58()}`);
+
+        // check the votes. since key2 voted, value should be 2
+        let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        console.log('keychain state after 2nd approval of key3: ', keychainState);
+        // 2 votes, but in position 1 & 2 binary, so value ==3
+        assert.ok(keychainState.pendingAction.votes.data == 3, 'key2 + key3 voted, which are keys 1 & 2, so value should be 3 (bitset!)');
+
+        // now the key4 needs to verify
+        txid = await keychainProgram.methods.verifyKey().accounts({
+          domain: domainPda,
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: key4KeyPda,
+          authority: key4.publicKey,
+          treasury: treasury.publicKey,
+          systemProgram: SystemProgram.programId
+        }).signers([key4]).rpc();
+
+        console.log(`verified key ${key4.publicKey.toBase58()} with key ${key4.publicKey.toBase58()}`);
+
+        let key = await keychainProgram.account.keyChainKey.fetch(key4KeyPda);
+        console.log(`created key account after verifying key3: ${key4KeyPda}`);
+
+        // keychain state will no longer have a pending action
+        keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        expect(keychainState.pendingAction).to.be.null;
+
+        // now there should be 3 keys
+        let keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
+
+        assert.ok(keychain.keys.length == 3, '4th key added, but total should be 3');
+      });
+
+      it("cancels a pending removal", async () => {
+
+        // remove the 4th key now with the 2nd key
+        let txid = await randomPlayerProgram.methods.removeKey(key4.publicKey).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: key4KeyPda,
+          authority: key2.publicKey,
+        }).signers([key2]).rpc();
+
+        // keyaccount still exists
+        let keyAccount = await keychainProgram.account.keyChainKey.fetch(key4KeyPda);
+
+        // now we vote against (cancel) w/3rd key - which should cancel the removal
+        await randomPlayerProgram.methods.votePendingAction(false).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: key4KeyPda,
+          authority: key3.publicKey,
+        }).signers([key3]).rpc();
+
+        // keychain state will no longer have a pending action
+        let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        expect(keychainState.pendingAction).to.be.null;
+
+        let keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
+        // should still be 3 keys
+        assert.ok(keychain.numKeys == 3, 'should still have 3 keys');
+        assert.ok(keychain.keys.length == 3, 'should still have 3 keys');
+      });
+
+
+      it("removes the 4th key from the keychain with 2 OTHER keys", async () => {
+        let keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
+        console.log(`numkeys: ${keychain.numKeys}`);
+        console.log(`keys length: ${keychain.keys.length}`);
+        for (let x = 0; x < keychain.keys.length; x++) {
+          console.log(`--key ${x}: ${keychain.keys[x].key.toBase58()}`);
+        }
+
+        // we'll remove the 4th key now with the 2nd key
+        let txid = await randomPlayerProgram.methods.removeKey(key4.publicKey).accounts({
+            keychain: playerKeychainPda,
+            keychainState: playerKeychainStatePda,
+            keychainKey: key4KeyPda,
+            authority: key2.publicKey,
+        }).signers([key2]).rpc();
+
+        // keyaccount still exists
+        let keyAccount = await keychainProgram.account.keyChainKey.fetch(key4KeyPda);
+
+        // so now we vote w/3rd key - which should execute the removal
+        await randomPlayerProgram.methods.votePendingAction(true).accounts({
+          keychain: playerKeychainPda,
+          keychainState: playerKeychainStatePda,
+          keychainKey: key4KeyPda,
+          authority: key3.publicKey,
+        }).signers([key3]).rpc();
+
+        let keychainState = await keychainProgram.account.keyChainState.fetch(playerKeychainStatePda);
+        expect(keychainState.pendingAction).to.be.null;
+
+        let keychainKeyAccount = await keychainProgram.account.keyChainKey.fetchNullable(playerKeychainKeyPda);
+        expect(keychainKeyAccount).to.be.null;
+
+        keychain = await keychainProgram.account.currentKeyChain.fetch(playerKeychainPda);
+        console.log(`after numkeys: ${keychain.numKeys}`);
+        console.log(`after keys length: ${keychain.keys.length}`);
+        for (let x = 0; x < keychain.keys.length; x++) {
+          console.log(`--key ${x}: ${keychain.keys[x].key.toBase58()}`);
+        }
+        assert.ok(keychain.numKeys == 2, 'should only be 2 key on the keychain');
+        assert.ok(keychain.keys.length == 2, 'should only be 2 key on the keychain');
+      });
+
+
+     it("closes an empty keychain account", async () => {
       let treasuryBalance = await provider.connection.getBalance(treasury.publicKey);
       console.log("treasury balance before removing key (and deleting keychain): ", treasuryBalance);
       let userBalance = await provider.connection.getBalance(key3.publicKey);
