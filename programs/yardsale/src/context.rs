@@ -11,6 +11,7 @@ use keychain::account::{CurrentDomain, CurrentKeyChain};
 
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use mpl_bubblegum::state::TreeConfig;
 
 #[derive(Clone)]
 pub struct MplBubblegum;
@@ -178,10 +179,9 @@ pub struct UpdatePrice<'info> {
 }
 
 #[derive(Accounts)]
-// #[instruction(asset_id: Pubkey)]
+#[instruction(asset_id: Pubkey)]
 pub struct ListCompressedNft<'info> {
 
-    /*
     #[account(
         constraint = domain.name == keychain.domain
     )]
@@ -201,7 +201,6 @@ pub struct ListCompressedNft<'info> {
     )]
     pub listing: Box<Account<'info, Listing>>,
 
-
     // asset id ..?
 
     // tree stuff
@@ -209,28 +208,27 @@ pub struct ListCompressedNft<'info> {
         seeds = [merkle_tree.key().as_ref()],
         bump,
         seeds::program = bubblegum_program.key(),
-        owner = bubblegum_program.key(),
+        // owner = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Account<'info, TreeConfig>,
 
-     */
 
     #[account(mut)]
     /// CHECK: This account is modified in the downstream program
     pub merkle_tree: UncheckedAccount<'info>,
 
-    // pub log_wrapper: Program<'info, Noop>,
-    // pub compression_program: Program<'info, SplAccountCompression>,
-    // pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
 
 
     /// CHECK: checking if this works
-    pub log_wrapper: UncheckedAccount<'info>,
+    // pub log_wrapper: UncheckedAccount<'info>,
     /// CHECK: checking if this works
-    pub compression_program: UncheckedAccount<'info>,
+    // pub compression_program: UncheckedAccount<'info>,
     /// CHECK: checking if this works
-    pub bubblegum_program: UncheckedAccount<'info>,
+    // pub bubblegum_program: UncheckedAccount<'info>,
 
 
     pub system_program: Program<'info, System>,

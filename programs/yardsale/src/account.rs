@@ -8,6 +8,7 @@ use crate::error::YardsaleError;
 // for some reason even though it has the account macro and is the same fucking code:
 // the trait `anchor_lang::AccountDeserialize` is not implemented for `TreeConfig
 
+/*
 #[account]
 pub struct TreeConfig {
     pub tree_creator: Pubkey,
@@ -27,6 +28,8 @@ impl TreeConfig {
         requested_capacity <= remaining_mints
     }
 }
+
+ */
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
 pub enum ItemType {

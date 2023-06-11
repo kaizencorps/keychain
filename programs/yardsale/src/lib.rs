@@ -107,7 +107,6 @@ pub mod yardsale {
     ) -> Result<()> {
 
         // remaining_accounts are the accounts that make up the required proof
-        /*
         let remaining_accounts_len = ctx.remaining_accounts.len();
         let mut accounts = Vec::with_capacity(
             8 // space for the 8 AccountMetas that are always included  (below)
@@ -171,8 +170,6 @@ pub mod yardsale {
 
         msg!("manual cpi call to bubblegum program transfer instruction");
         solana_program::program::invoke(&instruction, &account_infos[..])?;
-
-         */
 
         Ok(())
 
