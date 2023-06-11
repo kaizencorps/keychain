@@ -169,7 +169,7 @@ pub mod yardsale {
         };
 
         msg!("manual cpi call to bubblegum program transfer instruction");
-        solana_program::program::invoke(&instruction, &account_infos[..])?;
+        // solana_program::program::invoke(&instruction, &account_infos[..])?;
 
         Ok(())
 
