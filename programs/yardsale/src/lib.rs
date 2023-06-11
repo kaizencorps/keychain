@@ -14,11 +14,17 @@ use mpl_token_metadata::{
     state::{Metadata, ProgrammableConfig::V1, TokenMetadataAccount, TokenStandard},
 };
 
+// compression
+// use spl_account_compression::{
+//     program::SplAccountCompression, Noop,
+// };
+
+
 // "prod" / staging address
-declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
+// declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
 
 // "pnft" devnet address
-// declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
+declare_id!("xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W");
 
 pub mod error;
 pub mod account;
@@ -34,6 +40,7 @@ use util::*;
 
 #[program]
 pub mod yardsale {
+    use anchor_lang::solana_program;
     use anchor_lang::solana_program::program::invoke;
     use anchor_lang::solana_program::system_instruction;
     use mpl_token_auth_rules::payload::{Payload, PayloadType, SeedsVec};
@@ -72,6 +79,7 @@ pub mod yardsale {
         listing.currency = ctx.accounts.currency.key();
         listing.bump = *ctx.bumps.get("listing").unwrap();
         listing.treasury = ctx.accounts.domain.treasury.key();
+        listing.item_type = ItemType::Standard;
 
         if listing.currency == NATIVE_MINT {
             // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
@@ -87,8 +95,111 @@ pub mod yardsale {
         Ok(())
     }
 
+    pub fn list_compressed_nft<'info>(
+        ctx: Context<'_, '_, '_, 'info, ListCompressedNft<'info>>,
+        asset_id: Pubkey,
+        price: u64,
+        root: [u8; 32],
+        data_hash: [u8; 32],
+        creator_hash: [u8; 32],
+        nonce: u64,
+        index: u32,
+    ) -> Result<()> {
+
+        // remaining_accounts are the accounts that make up the required proof
+        /*
+        let remaining_accounts_len = ctx.remaining_accounts.len();
+        let mut accounts = Vec::with_capacity(
+            8 // space for the 8 AccountMetas that are always included  (below)
+                + remaining_accounts_len,
+        );
+        accounts.extend(vec![
+            AccountMeta::new_readonly(ctx.accounts.tree_authority.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), true),
+            AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.listing.key(), false),
+            AccountMeta::new(ctx.accounts.merkle_tree.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.log_wrapper.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.compression_program.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+        ]);
+
+        // from the bubblegum src [163, 52, 200, 231, 140, 3, 69, 186] => InstructionName::Transfer,
+        let transfer_discriminator: [u8; 8] = [163, 52, 200, 231, 140, 3, 69, 186];
+
+        let mut data = Vec::with_capacity(
+            8           // The length of transfer_discriminator,
+                + root.len()
+                + data_hash.len()
+                + creator_hash.len()
+                + 8 // The length of the nonce
+                + 8, // The length of the index
+        );
+        data.extend(transfer_discriminator);
+        data.extend(root);
+        data.extend(data_hash);
+        data.extend(creator_hash);
+        data.extend(nonce.to_le_bytes());
+        data.extend(index.to_le_bytes());
+
+        let mut account_infos = Vec::with_capacity(
+            8 // space for the 8 AccountInfos that are always included (below)
+                + remaining_accounts_len,
+        );
+        account_infos.extend(vec![
+            ctx.accounts.tree_authority.to_account_info(),
+            ctx.accounts.leaf_owner.to_account_info(),
+            ctx.accounts.leaf_owner.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.merkle_tree.to_account_info(),
+            ctx.accounts.log_wrapper.to_account_info(),
+            ctx.accounts.compression_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ]);
+
+        // Add "accounts" (hashes) that make up the merkle proof from the remaining accounts.
+        for acc in ctx.remaining_accounts.iter() {
+            accounts.push(AccountMeta::new_readonly(acc.key(), false));
+            account_infos.push(acc.to_account_info());
+        }
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: ctx.accounts.bubblegum_program.key(),
+            accounts,
+            data,
+        };
+
+        msg!("manual cpi call to bubblegum program transfer instruction");
+        solana_program::program::invoke(&instruction, &account_infos[..])?;
+
+         */
+
+        Ok(())
+
+        /* this way apparently doesn't work ..?   see: https://solana.stackexchange.com/questions/6410/anchor-cpi-bubblegum-burn-error-cause-not-signer
+        // new with signer for pda signing
+        // let cp_ctx = CpiContext::new_with_signer(
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.bubblegum_program.to_account_info(),
+            mpl_bubblegum::cpi::accounts::Transfer {
+                tree_authority: ctx.accounts.tree_authority.to_account_info(),
+                leaf_owner: ctx.accounts.leaf_owner.to_account_info(),
+                leaf_delegate: ctx.accounts.leaf_owner.to_account_info(),
+                new_leaf_owner: ctx.accounts.listing.to_account_info(),
+                merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+                log_wrapper: ctx.accounts.log_wrapper.to_account_info(),
+                compression_program: ctx.accounts.compression_program.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+            }
+            signer,
+        );
+
+         */
+
+    }
+
     pub fn list_pnft<'info>(
-        ctx: Context<'_, '_, '_, 'info, ListPNFT<'info>>,
+        ctx: Context<'_, '_, '_, 'info, ListProgrammableNft<'info>>,
         price: u64,
         authorization_data: Option<AuthorizationDataLocal>,
         rules_acc_present: bool,
@@ -135,6 +246,7 @@ pub mod yardsale {
         listing.currency = ctx.accounts.currency.key();
         listing.bump = *ctx.bumps.get("listing").unwrap();
         listing.treasury = ctx.accounts.domain.treasury.key();
+        listing.item_type = ItemType::Programmable;
 
         if listing.currency == NATIVE_MINT {
             // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
@@ -231,7 +343,7 @@ pub mod yardsale {
 
 
     // purchase an item
-    pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchasePNFT<'info>>) -> Result<()> {
+    pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchaseProgrammableNft<'info>>) -> Result<()> {
         let listing = &ctx.accounts.listing;
 
         make_purchase(
@@ -276,5 +388,72 @@ pub mod yardsale {
         Ok(())
 
     }
+
+    /*
+
+    pub fn purchase_cnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchaseCompressedNft<'info>>,
+                                root: [u8; 32],
+                                data_hash: [u8; 32],
+                                creator_hash: [u8; 32],
+                                nonce: u64,
+                                index: u32,) -> Result<()> {
+        msg!("attempting to send nft {} from tree {}", index, ctx.accounts.merkle_tree.key());
+
+        let mut accounts:  Vec<solana_program::instruction::AccountMeta> = vec![
+            AccountMeta::new_readonly(ctx.accounts.tree_authority.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), true),
+            AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.new_leaf_owner.key(), false),
+            AccountMeta::new(ctx.accounts.merkle_tree.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.log_wrapper.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.compression_program.key(), false),
+            AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+        ];
+
+        let mut data: Vec<u8> = vec![];
+        data.extend(TRANSFER_DISCRIMINATOR);
+        data.extend(root);
+        data.extend(data_hash);
+        data.extend(creator_hash);
+        data.extend(nonce.to_le_bytes());
+        data.extend(index.to_le_bytes());
+
+        let mut account_infos: Vec<AccountInfo> = vec![
+            ctx.accounts.tree_authority.to_account_info(),
+            ctx.accounts.leaf_owner.to_account_info(),
+            ctx.accounts.leaf_owner.to_account_info(),
+            ctx.accounts.new_leaf_owner.to_account_info(),
+            ctx.accounts.merkle_tree.to_account_info(),
+            ctx.accounts.log_wrapper.to_account_info(),
+            ctx.accounts.compression_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ];
+
+        // add "accounts" (hashes) that make up the merkle proof
+        for acc in ctx.remaining_accounts.iter() {
+            accounts.push(AccountMeta::new_readonly(acc.key(), false));
+            account_infos.push(acc.to_account_info());
+        }
+
+        msg!("manual cpi call");
+
+        invoke_signed(&instruction, &account_infos, signer).unwrap();
+
+
+        solana_program::program::invoke_signed(
+            & solana_program::instruction::Instruction {
+                program_id: ctx.accounts.bubblegum_program.key(),
+                accounts: accounts,
+                data: data,
+            },
+            &account_infos[..],
+            &[&[b"cNFT-vault", &[*ctx.bumps.get("leaf_owner").unwrap()]]])
+            .map_err(Into::into)
+
+    }
+
+     */
+
+
 
 }

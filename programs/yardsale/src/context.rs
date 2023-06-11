@@ -1,4 +1,7 @@
 use anchor_lang::prelude::*;
+use std::str::FromStr;
+use solana_program::{pubkey::Pubkey};
+
 use crate::account::*;
 use crate::constant::*;
 use crate::error::*;
@@ -8,6 +11,43 @@ use keychain::account::{CurrentDomain, CurrentKeyChain};
 
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+
+#[derive(Clone)]
+pub struct MplBubblegum;
+
+impl anchor_lang::Id for MplBubblegum {
+    fn id() -> Pubkey {
+        mpl_bubblegum::id()
+    }
+}
+
+// not sure why the use spl_account_compression::Noop/SplAccountCompression IDs don't work
+// maybe cause the solana-program ids and stuff
+/*use spl_account_compression::{
+    program::SplAccountCompression, Noop,
+};
+*/
+
+// const NOOP_PROGRAM_ID: Pubkey = Pubkey::from_str("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV").unwrap();
+
+#[derive(Clone)]
+pub struct Noop;
+
+impl anchor_lang::Id for Noop {
+    fn id() -> Pubkey {
+        Pubkey::from_str("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV").unwrap()
+    }
+}
+
+
+#[derive(Clone)]
+pub struct SplAccountCompression;
+
+impl anchor_lang::Id for SplAccountCompression {
+    fn id() -> Pubkey {
+        spl_account_compression::id()
+    }
+}
 
 
 #[derive(Accounts)]
@@ -138,7 +178,69 @@ pub struct UpdatePrice<'info> {
 }
 
 #[derive(Accounts)]
-pub struct ListPNFT<'info> {
+// #[instruction(asset_id: Pubkey)]
+pub struct ListCompressedNft<'info> {
+
+    /*
+    #[account(
+        constraint = domain.name == keychain.domain
+    )]
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
+    #[account(
+        constraint = keychain.has_key(& leaf_owner.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(
+        init,
+        payer = leaf_owner,
+        seeds = [asset_id.as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+        bump,
+        space = 8 + Listing::MAX_SIZE,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+
+    // asset id ..?
+
+    // tree stuff
+    #[account(
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key(),
+        owner = bubblegum_program.key(),
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Account<'info, TreeConfig>,
+
+     */
+
+    #[account(mut)]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    // pub log_wrapper: Program<'info, Noop>,
+    // pub compression_program: Program<'info, SplAccountCompression>,
+    // pub bubblegum_program: Program<'info, MplBubblegum>,
+
+
+    /// CHECK: checking if this works
+    pub log_wrapper: UncheckedAccount<'info>,
+    /// CHECK: checking if this works
+    pub compression_program: UncheckedAccount<'info>,
+    /// CHECK: checking if this works
+    pub bubblegum_program: UncheckedAccount<'info>,
+
+
+    pub system_program: Program<'info, System>,
+
+    #[account(mut)]
+    pub leaf_owner: Signer<'info>, // seller
+}
+
+#[derive(Accounts)]
+pub struct ListProgrammableNft<'info> {
 
     #[account(
         constraint = domain.name == keychain.domain
@@ -393,7 +495,7 @@ pub struct DelistPNFT<'info> {
 }
 
 #[derive(Accounts)]
-pub struct PurchasePNFT<'info> {
+pub struct PurchaseProgrammableNft<'info> {
 
     #[account(
         mut,
@@ -613,4 +715,32 @@ pub struct PurchaseItem<'info> {
     pub system_program: Program <'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct PurchaseCompressedNft<'info> {
+
+    #[account(
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key()
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Account<'info, TreeConfig>,
+
+    #[account(
+        seeds = [b"cNFT-vault"],
+        bump,
+    )]
+    /// CHECK: This account doesnt even exist (it is just the pda to sign)
+    pub leaf_owner: UncheckedAccount<'info>, // sender (the vault in our case)
+    /// CHECK: This account is neither written to nor read from.
+    pub new_leaf_owner: UncheckedAccount<'info>, // receiver
+    #[account(mut)]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub system_program: Program<'info, System>,
+}
 
