@@ -108,6 +108,7 @@ pub mod yardsale {
 
         msg!("attempting to send nft {} from tree {}", index, ctx.accounts.merkle_tree.key());
 
+        /*
         let mut accounts:  Vec<solana_program::instruction::AccountMeta> = vec![
             AccountMeta::new_readonly(ctx.accounts.tree_authority.key(), false),
             AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), true),
@@ -154,6 +155,10 @@ pub mod yardsale {
             &account_infos[..])
             // &[&[b"cNFT-vault", &[*ctx.bumps.get("leaf_owner").unwrap()]]])
             .map_err(Into::into)
+
+         */
+
+        Ok(())
 
 
         /*
