@@ -45,7 +45,7 @@ impl Listing {
             8 + // price
             32 + // currency
             32 + // proceeds account (token account or regular if sol = currency)
-            1 + //
+            1 + // item type
             191; // extra space
 }
 

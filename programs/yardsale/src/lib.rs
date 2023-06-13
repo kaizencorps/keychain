@@ -97,18 +97,19 @@ pub mod yardsale {
 
     pub fn list_compressed_nft<'info>(
         ctx: Context<'_, '_, '_, 'info, ListCompressedNft<'info>>,
-        asset_id: Pubkey,
-        price: u64,
         root: [u8; 32],
         data_hash: [u8; 32],
         creator_hash: [u8; 32],
         nonce: u64,
         index: u32,
+        price: u64,
+        asset_id: Pubkey,
     ) -> Result<()> {
 
         msg!("attempting to send nft {} from tree {}", index, ctx.accounts.merkle_tree.key());
 
         /*
+
         let mut accounts:  Vec<solana_program::instruction::AccountMeta> = vec![
             AccountMeta::new_readonly(ctx.accounts.tree_authority.key(), false),
             AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), true),
@@ -156,12 +157,10 @@ pub mod yardsale {
             // &[&[b"cNFT-vault", &[*ctx.bumps.get("leaf_owner").unwrap()]]])
             .map_err(Into::into)
 
-         */
 
         Ok(())
+         */
 
-
-        /*
 
         // remaining_accounts are the accounts that make up the required proof
         let remaining_accounts_len = ctx.remaining_accounts.len();
@@ -226,11 +225,10 @@ pub mod yardsale {
         };
 
         msg!("manual cpi call to bubblegum program transfer instruction");
-        // solana_program::program::invoke(&instruction, &account_infos[..])?;
+        solana_program::program::invoke(&instruction, &account_infos[..])?;
 
         Ok(())
 
-         */
 
         /* this way apparently doesn't work ..?   see: https://solana.stackexchange.com/questions/6410/anchor-cpi-bubblegum-burn-error-cause-not-signer
         // new with signer for pda signing

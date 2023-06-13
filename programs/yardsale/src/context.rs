@@ -201,14 +201,12 @@ pub struct ListCompressedNft<'info> {
     )]
     pub listing: Box<Account<'info, Listing>>,
 
-    // asset id ..?
 
     // tree stuff
     #[account(
         seeds = [merkle_tree.key().as_ref()],
         bump,
         seeds::program = bubblegum_program.key(),
-        // owner = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Account<'info, TreeConfig>,
@@ -221,16 +219,6 @@ pub struct ListCompressedNft<'info> {
     pub log_wrapper: Program<'info, Noop>,
     pub compression_program: Program<'info, SplAccountCompression>,
     pub bubblegum_program: Program<'info, MplBubblegum>,
-
-
-    /// CHECK: checking if this works
-    // pub log_wrapper: UncheckedAccount<'info>,
-    /// CHECK: checking if this works
-    // pub compression_program: UncheckedAccount<'info>,
-    /// CHECK: checking if this works
-    // pub bubblegum_program: UncheckedAccount<'info>,
-
-
     pub system_program: Program<'info, System>,
 
     #[account(mut)]
