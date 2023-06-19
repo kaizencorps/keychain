@@ -3,7 +3,7 @@ import path from "path";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
 // define some default locations
-const DEFAULT_KEY_DIR_NAME = ".local_keys";
+const DEFAULT_DATA_DIR_NAME = "data";
 const DEFAULT_PUBLIC_KEY_FILE = "keys.json";
 const DEFAULT_DEMO_DATA_FILE = "demo.json";
 
@@ -11,11 +11,11 @@ const DEFAULT_DEMO_DATA_FILE = "demo.json";
   Load locally stored PublicKey addresses
 */
 export function loadPublicKeysFromFile(
-    absPath: string = `${DEFAULT_KEY_DIR_NAME}/${DEFAULT_PUBLIC_KEY_FILE}`,
+    absPath: string = `${DEFAULT_DATA_DIR_NAME}/${DEFAULT_PUBLIC_KEY_FILE}`,
 ) {
   try {
     if (!absPath) throw Error("No path provided");
-    if (!fs.existsSync(absPath)) throw Error("File does not exist.");
+    if (!fs.existsSync(absPath)) throw Error("Keys file (keys.json) does not exist.");
 
     // load the public keys from the file
     const data = JSON.parse(fs.readFileSync(absPath, { encoding: "utf-8" })) || {};
@@ -27,10 +27,9 @@ export function loadPublicKeysFromFile(
 
     return data;
   } catch (err) {
-    // console.warn("Unable to load local file");
+    console.warn("Unable to load local file", err);
+    throw err;
   }
-  // always return an object
-  return {};
 }
 
 /*
@@ -39,7 +38,7 @@ export function loadPublicKeysFromFile(
 export function saveDemoDataToFile(
     name: string,
     newData: any,
-    absPath: string = `${DEFAULT_KEY_DIR_NAME}/${DEFAULT_DEMO_DATA_FILE}`,
+    absPath: string = `${DEFAULT_DATA_DIR_NAME}/${DEFAULT_DEMO_DATA_FILE}`,
 ) {
   try {
     let data: object = {};
@@ -71,7 +70,7 @@ export function saveDemoDataToFile(
 export function savePublicKeyToFile(
     name: string,
     publicKey: PublicKey,
-    absPath: string = `${DEFAULT_KEY_DIR_NAME}/${DEFAULT_PUBLIC_KEY_FILE}`,
+    absPath: string = `${DEFAULT_DATA_DIR_NAME}/${DEFAULT_PUBLIC_KEY_FILE}`,
 ) {
   try {
     // if (!absPath) throw Error("No path provided");
@@ -96,7 +95,8 @@ export function savePublicKeyToFile(
 
     return data;
   } catch (err) {
-    console.warn("Unable to save to file");
+    console.warn("Unable to save to file", err);
+    throw err;
   }
   // always return an object
   return {};
@@ -105,6 +105,7 @@ export function savePublicKeyToFile(
 /*
   Load a locally stored JSON keypair file and convert it to a valid Keypair
 */
+/*
 export function loadKeypairFromFile(absPath: string) {
   try {
     if (!absPath) throw Error("No path provided");
@@ -120,14 +121,16 @@ export function loadKeypairFromFile(absPath: string) {
     throw err;
   }
 }
+*/
 
 /*
   Save a locally stored JSON keypair file for later importing
 */
+/*
 export function saveKeypairToFile(
     keypair: Keypair,
     fileName: string,
-    dirName: string = DEFAULT_KEY_DIR_NAME,
+    dirName: string = DEFAULT_DATA_DIR_NAME,
 ) {
   fileName = path.join(dirName, `${fileName}.json`);
 
@@ -144,27 +147,7 @@ export function saveKeypairToFile(
 
   return fileName;
 }
-
-/*
-  Attempt to load a keypair from the filesystem, or generate and save a new one
 */
-export function loadOrGenerateKeypair(fileName: string, dirName: string = DEFAULT_KEY_DIR_NAME) {
-  try {
-    // compute the path to locate the file
-    const searchPath = path.join(dirName, `${fileName}.json`);
-    let keypair = Keypair.generate();
-
-    // attempt to load the keypair from the file
-    if (fs.existsSync(searchPath)) keypair = loadKeypairFromFile(searchPath);
-    // when unable to locate the keypair, save the new one
-    else saveKeypairToFile(keypair, fileName, dirName);
-
-    return keypair;
-  } catch (err) {
-    console.error("loadOrGenerateKeypair:", err);
-    throw err;
-  }
-}
 
 /*
   Compute the Solana explorer address for the various data
@@ -188,37 +171,6 @@ export function explorerURL({
   const url = new URL(baseUrl);
   url.searchParams.append("cluster", cluster || "devnet");
   return url.toString() + "\n";
-}
-
-/**
- * Auto airdrop the given wallet of of a balance of < 0.5 SOL
- */
-export async function airdropOnLowBalance(
-    connection: Connection,
-    keypair: Keypair,
-    forceAirdrop: boolean = false,
-) {
-  // get the current balance
-  let balance = await connection.getBalance(keypair.publicKey);
-
-  // define the low balance threshold before airdrop
-  const MIN_BALANCE_TO_AIRDROP = LAMPORTS_PER_SOL / 2; // current: 0.5 SOL
-
-  // check the balance of the two accounts, airdrop when low
-  if (forceAirdrop === true || balance < MIN_BALANCE_TO_AIRDROP) {
-    console.log(`Requesting airdrop of 1 SOL to ${keypair.publicKey.toBase58()}...`);
-    await connection.requestAirdrop(keypair.publicKey, LAMPORTS_PER_SOL).then(sig => {
-      console.log("Tx signature:", sig);
-      // balance = balance + LAMPORTS_PER_SOL;
-    });
-
-    // fetch the new balance
-    // const newBalance = await connection.getBalance(keypair.publicKey);
-    // return newBalance;
-  }
-  // else console.log("Balance of:", balance / LAMPORTS_PER_SOL, "SOL");
-
-  return balance;
 }
 
 /*
@@ -305,8 +257,7 @@ const fakeNftData = [
     rangeLower: 1,
     rangeUpper: 9999
   },
-
-]
+];
 
 export function getRandomFakeNftMetadata(feePayer: PublicKey) {
   let nft = fakeNftData[Math.floor(Math.random() * fakeNftData.length)];

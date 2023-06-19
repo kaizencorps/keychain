@@ -97,18 +97,17 @@ pub mod yardsale {
 
     pub fn list_compressed_nft<'info>(
         ctx: Context<'_, '_, '_, 'info, ListCompressedNft<'info>>,
+        asset_id: Pubkey,
         root: [u8; 32],
         data_hash: [u8; 32],
         creator_hash: [u8; 32],
         nonce: u64,
         index: u32,
         price: u64,
-        asset_id: Pubkey,
     ) -> Result<()> {
 
         msg!("attempting to send nft {} from tree {}", index, ctx.accounts.merkle_tree.key());
 
-        /*
 
         let mut accounts:  Vec<solana_program::instruction::AccountMeta> = vec![
             AccountMeta::new_readonly(ctx.accounts.tree_authority.key(), false),
@@ -121,7 +120,15 @@ pub mod yardsale {
             AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
         ];
 
-        let mut data: Vec<u8> = vec![];
+        // let mut data: Vec<u8> = vec![];
+        let mut data = Vec::with_capacity(
+            8           // The length of transfer_discriminator,
+                + root.len()
+                + data_hash.len()
+                + creator_hash.len()
+                + 8 // The length of the nonce
+                + 8, // The length of the index
+        );
         data.extend(TRANSFER_DISCRIMINATOR);
         data.extend(root);
         data.extend(data_hash);
@@ -146,109 +153,18 @@ pub mod yardsale {
             account_infos.push(acc.to_account_info());
         }
 
-        msg!("manual cpi call");
-        solana_program::program::invoke(
-            & solana_program::instruction::Instruction {
-                program_id: ctx.accounts.bubblegum_program.key(),
-                accounts: accounts,
-                data: data,
-            },
-            &account_infos[..])
-            // &[&[b"cNFT-vault", &[*ctx.bumps.get("leaf_owner").unwrap()]]])
-            .map_err(Into::into)
-
-
-        Ok(())
-         */
-
-
-        // remaining_accounts are the accounts that make up the required proof
-        let remaining_accounts_len = ctx.remaining_accounts.len();
-        let mut accounts = Vec::with_capacity(
-            8 // space for the 8 AccountMetas that are always included  (below)
-                + remaining_accounts_len,
-        );
-        accounts.extend(vec![
-            AccountMeta::new_readonly(ctx.accounts.tree_authority.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), true),
-            AccountMeta::new_readonly(ctx.accounts.leaf_owner.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.listing.key(), false),
-            AccountMeta::new(ctx.accounts.merkle_tree.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.log_wrapper.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.compression_program.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
-        ]);
-
-        // from the bubblegum src [163, 52, 200, 231, 140, 3, 69, 186] => InstructionName::Transfer,
-        let transfer_discriminator: [u8; 8] = [163, 52, 200, 231, 140, 3, 69, 186];
-
-        let mut data = Vec::with_capacity(
-            8           // The length of transfer_discriminator,
-                + root.len()
-                + data_hash.len()
-                + creator_hash.len()
-                + 8 // The length of the nonce
-                + 8, // The length of the index
-        );
-        data.extend(transfer_discriminator);
-        data.extend(root);
-        data.extend(data_hash);
-        data.extend(creator_hash);
-        data.extend(nonce.to_le_bytes());
-        data.extend(index.to_le_bytes());
-
-        let mut account_infos = Vec::with_capacity(
-            8 // space for the 8 AccountInfos that are always included (below)
-                + remaining_accounts_len,
-        );
-        account_infos.extend(vec![
-            ctx.accounts.tree_authority.to_account_info(),
-            ctx.accounts.leaf_owner.to_account_info(),
-            ctx.accounts.leaf_owner.to_account_info(),
-            ctx.accounts.listing.to_account_info(),
-            ctx.accounts.merkle_tree.to_account_info(),
-            ctx.accounts.log_wrapper.to_account_info(),
-            ctx.accounts.compression_program.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-        ]);
-
-        // Add "accounts" (hashes) that make up the merkle proof from the remaining accounts.
-        for acc in ctx.remaining_accounts.iter() {
-            accounts.push(AccountMeta::new_readonly(acc.key(), false));
-            account_infos.push(acc.to_account_info());
-        }
-
         let instruction = solana_program::instruction::Instruction {
             program_id: ctx.accounts.bubblegum_program.key(),
             accounts,
             data,
         };
 
-        msg!("manual cpi call to bubblegum program transfer instruction");
-        solana_program::program::invoke(&instruction, &account_infos[..])?;
+        // msg!("manual cpi call to bubblegum program transfer instruction");
+        solana_program::program::invoke(
+            &instruction,
+            &account_infos[..])?;
 
         Ok(())
-
-
-        /* this way apparently doesn't work ..?   see: https://solana.stackexchange.com/questions/6410/anchor-cpi-bubblegum-burn-error-cause-not-signer
-        // new with signer for pda signing
-        // let cp_ctx = CpiContext::new_with_signer(
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.bubblegum_program.to_account_info(),
-            mpl_bubblegum::cpi::accounts::Transfer {
-                tree_authority: ctx.accounts.tree_authority.to_account_info(),
-                leaf_owner: ctx.accounts.leaf_owner.to_account_info(),
-                leaf_delegate: ctx.accounts.leaf_owner.to_account_info(),
-                new_leaf_owner: ctx.accounts.listing.to_account_info(),
-                merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-                log_wrapper: ctx.accounts.log_wrapper.to_account_info(),
-                compression_program: ctx.accounts.compression_program.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-            }
-            signer,
-        );
-
-         */
 
     }
 

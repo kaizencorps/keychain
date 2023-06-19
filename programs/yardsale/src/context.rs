@@ -201,7 +201,6 @@ pub struct ListCompressedNft<'info> {
     )]
     pub listing: Box<Account<'info, Listing>>,
 
-
     // tree stuff
     #[account(
         seeds = [merkle_tree.key().as_ref()],
@@ -210,6 +209,8 @@ pub struct ListCompressedNft<'info> {
     )]
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Account<'info, TreeConfig>,
+
+
 
 
     #[account(mut)]

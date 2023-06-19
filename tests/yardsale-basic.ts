@@ -8,7 +8,7 @@ import {
   findKeychainKeyPda,
   findKeychainPda,
   findKeychainStatePda,
-  findListingPda, findListingPdaByName,
+  findListingPda,
 } from "./utils";
 import * as assert from "assert";
 import {
@@ -58,20 +58,16 @@ let tx;
 let assetId;
 
 describe("yardsale compressed NFTs", () => {
+
   let provider = anchor.AnchorProvider.env();
   const payer = provider.wallet.publicKey;
 
-  const RPC_URL = 'https://rpc-devnet.helius.xyz/?api-key=df2f8e0d-099d-4110-b63e-7b5f6a53673e';
-
-  let baseRpc = RPC_URL.substring(0, RPC_URL.indexOf('?') + 1);
-  console.log('baseRpc: ', baseRpc);
-
-  const connectionWrapper = new HeliusConnectionWrapper(RPC_URL);
-  provider = new anchor.AnchorProvider(connectionWrapper, provider.wallet, {});
+  const connection = provider.connection;
 
   let keychainProgram = anchor.workspace.Keychain as Program<Keychain>;
   let yardsaleProgram = anchor.workspace.Yardsale as Program<Yardsale>;
 
+  console.log(`>>>>> connection: ${connection.rpcEndpoint} <<<<<<<`);
   console.log('keychainProgram: ', keychainProgram.programId.toBase58());
   console.log('yardsaleProgram: ', yardsaleProgram.programId.toBase58());
 
@@ -86,22 +82,29 @@ describe("yardsale compressed NFTs", () => {
   console.log(`\n\n...>>> user: ${provider.wallet.publicKey.toBase58()}`);
 
 
+  let treeAddress: PublicKey = null;
+  let treeAuthority: PublicKey = null;
+  let collectionMint: PublicKey = null;
+  let collectionMetadataAccount: PublicKey = null;
+  let collectionMasterEditionAccount: PublicKey = null;
+
+
+
   it("sets up testing env", async () => {
 
-    // mint a bunch of compressed nfts - all this from the compressed-nfts repo
 
     // load the stored PublicKeys for ease of use
     let keys = loadPublicKeysFromFile();
 
     // ensure the primary script (to create the collection) was already run
     if (!keys?.collectionMint || !keys?.treeAddress)
-      return console.warn("No local keys were found. Please run the `createTree` script in the messhall/compression");
+      return console.warn("No local keys were found. Please run the `index` script");
 
-    const treeAddress: PublicKey = keys.treeAddress;
-    const treeAuthority: PublicKey = keys.treeAuthority;
-    const collectionMint: PublicKey = keys.collectionMint;
-    const collectionMetadataAccount: PublicKey = keys.collectionMetadataAccount;
-    const collectionMasterEditionAccount: PublicKey = keys.collectionMasterEditionAccount;
+    treeAddress = keys.treeAddress;
+    treeAuthority= keys.treeAuthority;
+    collectionMint= keys.collectionMint;
+    collectionMetadataAccount= keys.collectionMetadataAccount;
+    collectionMasterEditionAccount= keys.collectionMasterEditionAccount;
 
     console.log("==== Local PublicKeys loaded ====");
     console.log("Tree address:", treeAddress.toBase58());
@@ -109,56 +112,6 @@ describe("yardsale compressed NFTs", () => {
     console.log("Collection mint:", collectionMint.toBase58());
     console.log("Collection metadata:", collectionMetadataAccount.toBase58());
     console.log("Collection master edition:", collectionMasterEditionAccount.toBase58());
-
-
-    // see if the user already has any assets
-    let rpcResp = await connectionWrapper
-        .getAssetsByOwner({
-          ownerAddress: payer.toBase58(),
-        });
-
-    // first, mint a compressed nft from the tree
-
-      const data = getRandomFakeNftMetadata(payer);
-      const compressedNFTMetadata: MetadataArgs = {
-        ...data,
-        editionNonce: 0,
-        uses: null,
-        collection: null,
-        primarySaleHappened: false,
-        sellerFeeBasisPoints: 0,
-        isMutable: false,
-        // values taken from the Bubblegum package
-        tokenProgramVersion: TokenProgramVersion.Original,
-        // @ts-ignore
-        tokenStandard: TokenStandard.NonFungible,
-      };
-
-      // fully mint a single compressed NFT to the payer
-      console.log(`Minting a single compressed NFT to ${payer.toBase58()}...`);
-
-      tx = createMintCompressedNftTx(
-          connectionWrapper,
-          payer,
-          treeAddress,
-          collectionMint,
-          collectionMetadataAccount,
-          collectionMasterEditionAccount,
-          compressedNFTMetadata,
-          // mint to this specific wallet (in this case, the tree owner aka `payer`)
-          payer,
-      );
-
-      txid = await provider.sendAndConfirm(tx);
-
-      console.log("confirming mint tx: ", txid);
-
-      await provider.connection.confirmTransaction(txid, 'finalized');
-
-      // get the asset id
-      assetId = await fetchAssetId(txid, treeAddress, connectionWrapper);
-
-      console.log(`Minted a single compressed NFT to ${payer.toBase58()}, txid: ${txid}, assetId: ${assetId}`);
 
 
     // create the keychain domain + user's keychain
@@ -187,7 +140,7 @@ describe("yardsale compressed NFTs", () => {
       }).transaction();
 
       txid = await provider.sendAndConfirm(tx);
-      await connectionWrapper.confirmTransaction(txid, 'finalized');
+      await connection.confirmTransaction(txid, 'finalized');
 
       console.log(`created keychain domain tx: ${txid}`);
     } else {
@@ -211,66 +164,19 @@ describe("yardsale compressed NFTs", () => {
       }).transaction();
 
       txid = await provider.sendAndConfirm(tx);
-      await connectionWrapper.confirmTransaction(txid, 'finalized');
+      await connection.confirmTransaction(txid, 'finalized');
       console.log(`created keychain for ${stacheid}. tx: ${txid}`);
     } else {
       console.log("keychain exists, skipping...");
     }
 
-    console.log("--- setup complete! ---\n\n");
-
   });
 
   it("list and buy an nft in sol", async () => {
 
-    console.log('fetching asset info for assetId: ', assetId);
-    let assetIdKey = new PublicKey(assetId);
 
-    // some of this stuff is redundant from the previous test, but demoing how to do it
-    let asset = await connectionWrapper.getAsset(assetIdKey);
-    console.log('fetched asset: ', asset);
-    let assetProof = await connectionWrapper.getAssetProof(assetIdKey);
-    let treeAddress = new PublicKey(asset.compression.tree)
-    let treeAccount = await ConcurrentMerkleTreeAccount.fromAccountAddress(
-        connectionWrapper,
-        treeAddress
-    );
-    const treeAuthority = treeAccount.getAuthority();
-
-    /*
-    const [treeAuthority, _bump2] = anchor.web3.PublicKey.findProgramAddressSync(
-        [treeAddress.toBuffer()],
-        BUBBLEGUM_PROGRAM_ID,
-    );
-
-     */
-
-    const canopyDepth = treeAccount.getCanopyDepth();
-
-    // get "proof path" from asset proof, these are the accounts that need to be passed to the program as remaining accounts
-    // may also be empty if tree is small enough, and canopy depth is large enough
-    const proofPath: AccountMeta[] = assetProof.proof
-        .map((node: string) => ({
-          pubkey: new PublicKey(node),
-          isSigner: false,
-          isWritable: false,
-        }))
-        .slice(0, assetProof.proof.length - (!!canopyDepth ? canopyDepth : 0))
-
-    console.log(`canopy depth: ${canopyDepth}, asset proof.proof.length: ${assetProof.proof.length}. proof path length: ${proofPath.length}`);
-
-    // get root, data hash, creator hash, nonce, and index from asset and asset proof
-    const root = [...new PublicKey(assetProof.root.trim()).toBytes()];
-    const dataHash = [
-      ...new PublicKey(asset.compression.data_hash.trim()).toBytes(),
-    ];
-    const creatorHash = [
-      ...new PublicKey(asset.compression.creator_hash.trim()).toBytes(),
-    ];
-    const nonce = asset.compression.leaf_id;
-    const index = asset.compression.leaf_id;
-
-    const listingName = assetIdKey.toBase58().slice(0, 16);
+    // for debugging
+    let assetIdKey = Keypair.generate().publicKey;
 
     let [listingPda] = findListingPda(assetIdKey, stacheid, domain, yardsaleProgram.programId);
 
@@ -285,41 +191,53 @@ describe("yardsale compressed NFTs", () => {
     console.log('domainPda: ', domainPda.toBase58());
     console.log('keychainPda: ', userKeychainPda.toBase58());
 
-
     // list the compressed nft
     tx = await yardsaleProgram.methods.listCompressedNft(
-          assetIdKey,
-          root,
-          dataHash,
-          creatorHash,
-          new anchor.BN(nonce),
-          index,
-          price
-        )
+            [...assetIdKey.toBytes()],
+            [...assetIdKey.toBytes()],
+            [...assetIdKey.toBytes()],
+            new anchor.BN(22),
+            1,
+            price,
+            assetIdKey,
+            )
         .accounts({
           domain: domainPda,
           keychain: userKeychainPda,
           listing: listingPda,
-          treeAuthority,
+          // treeAuthority: domainPda,
           leafOwner: payer,
-          merkleTree: treeAddress,
+          merkleTree: domainPda,
+
           logWrapper: SPL_NOOP_PROGRAM_ID,
-          bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
           compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
+
+          // domain: domainPda,
+          // keychain: userKeychainPda,
+          // listing: listingPda,
+          // treeAuthority,
+          // leafOwner: payer,
+          // merkleTree: treeAddress,
+          // logWrapper: SPL_NOOP_PROGRAM_ID,
+          // bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+          // compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          // systemProgram: SystemProgram.programId,
         })
-        .remainingAccounts(proofPath)
+        // .remainingAccounts(proofPath)
         .transaction();
 
     txid = await provider.sendAndConfirm(tx);
 
     console.log('confirming list compressed NFT tx: ', txid);
 
-    await connectionWrapper.confirmTransaction(txid, "finalized");
+    await connection.confirmTransaction(txid, "finalized");
 
     console.log(`listed compressed nft: ${assetId} for ${price} sol: ${txid}, owner listing pda: ${listingPda.toBase58()}`);
 
     // check that the nft is in the listing account
+    /*
     let listing = await yardsaleProgram.account.listing.fetch(listingPda);
     console.log(`listing: ${JSON.stringify(listing, null, 2)}`);
 
@@ -329,6 +247,8 @@ describe("yardsale compressed NFTs", () => {
         });
 
     console.log('listing pda assets: ', rpcResp);
+
+     */
 
 
   });
