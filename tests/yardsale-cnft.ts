@@ -58,6 +58,8 @@ let sellerCurrencyTokenAcct: PublicKey = null;
 let txid;
 let tx;
 let assetId;
+let assetId2;
+
 let buyer: Keypair = Keypair.generate();
 
 describe("yardsale compressed NFTs", () => {
@@ -224,7 +226,7 @@ describe("yardsale compressed NFTs", () => {
 
   });
 
-  it("list and buy an nft in sol", async () => {
+  it("list a cnft in sol", async () => {
 
     console.log('fetching asset info for assetId: ', assetId);
     let assetIdKey = new PublicKey(assetId);
@@ -350,6 +352,160 @@ describe("yardsale compressed NFTs", () => {
 
     // set the proper treasury to be used for purchasing below
     treasury = listingAccount.treasury;
+  });
+
+  it("delist and relist a cnft in sol", async () => {
+
+    let assetIdKey = new PublicKey(assetId);
+
+    // some of this stuff is redundant from the previous test, but demoing how to do it
+    let asset = await connectionWrapper.getAsset(assetIdKey);
+    let assetProof = await connectionWrapper.getAssetProof(assetIdKey);
+    let treeAddress = new PublicKey(asset.compression.tree)
+    let treeAccount = await ConcurrentMerkleTreeAccount.fromAccountAddress(
+        connectionWrapper,
+        treeAddress
+    );
+    let treeAuthority = treeAccount.getAuthority();
+    let canopyDepth = treeAccount.getCanopyDepth();
+
+    // get "proof path" from asset proof, these are the accounts that need to be passed to the program as remaining accounts
+    // may also be empty if tree is small enough, and canopy depth is large enough
+    let proofPath: AccountMeta[] = assetProof.proof
+        .map((node: string) => ({
+          pubkey: new PublicKey(node),
+          isSigner: false,
+          isWritable: false,
+        }))
+        .slice(0, assetProof.proof.length - (!!canopyDepth ? canopyDepth : 0))
+
+    console.log(`canopy depth: ${canopyDepth}, asset proof.proof.length: ${assetProof.proof.length}. proof path length: ${proofPath.length}`);
+
+    // get root, data hash, creator hash, nonce, and index from asset and asset proof
+    let root = [...new PublicKey(assetProof.root.trim()).toBytes()];
+    let dataHash = [
+      ...new PublicKey(asset.compression.data_hash.trim()).toBytes(),
+    ];
+    let creatorHash = [
+      ...new PublicKey(asset.compression.creator_hash.trim()).toBytes(),
+    ];
+    let nonce = asset.compression.leaf_id;
+    let index = asset.compression.leaf_id;
+
+    let [listingPda] = findListingPda(assetIdKey, stacheid, domain, yardsaleProgram.programId);
+
+    // delist this bitch
+    tx = await yardsaleProgram.methods.delistCnft(
+            root,
+            dataHash,
+            creatorHash,
+            new anchor.BN(nonce),
+            index,
+        )
+        .accounts({
+          listing: listingPda,
+          keychain: userKeychainPda,
+          authority: payer,
+          treeAuthority,
+          merkleTree: treeAddress,
+          logWrapper: SPL_NOOP_PROGRAM_ID,
+          bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+          compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts(proofPath)
+        .transaction();
+
+    txid = await provider.sendAndConfirm(tx);
+    console.log('confirming delist compressed NFT tx: ', txid);
+    await connectionWrapper.confirmTransaction(txid, "finalized");
+    console.log(`delisted compressed nft: ${assetId}: ${txid}`);
+
+    // confirm it's back in payer's possession
+    let rpcResp = await connectionWrapper
+        .getAssetsByOwner({
+          ownerAddress: payer.toBase58(),
+        });
+
+    const foundAssets = rpcResp.items.filter((item) => item.id === assetId);
+    expect(foundAssets.length).to.equal(1);
+
+    // confirm that listing was destroyed
+    let listingAccount = await yardsaleProgram.account.listing.fetchNullable(listingPda);
+    expect(listingAccount).to.be.null;
+
+    //////////////////////////////////// now we relist it
+    //////////////////////////////////// now we relist it
+    //////////////////////////////////// now we relist it
+
+    console.log('relisting compressed nft listing w/listingPda: ', listingPda.toBase58());
+    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.00001);
+
+    // recalculate the proofs and shit
+    asset = await connectionWrapper.getAsset(assetIdKey);
+    assetProof = await connectionWrapper.getAssetProof(assetIdKey);
+    treeAddress = new PublicKey(asset.compression.tree)
+    treeAccount = await ConcurrentMerkleTreeAccount.fromAccountAddress(
+        connectionWrapper,
+        treeAddress
+    );
+    treeAuthority = treeAccount.getAuthority();
+    canopyDepth = treeAccount.getCanopyDepth();
+
+    proofPath = assetProof.proof
+        .map((node: string) => ({
+          pubkey: new PublicKey(node),
+          isSigner: false,
+          isWritable: false,
+        }))
+        .slice(0, assetProof.proof.length - (!!canopyDepth ? canopyDepth : 0))
+
+    // get root, data hash, creator hash, nonce, and index from asset and asset proof
+    root = [...new PublicKey(assetProof.root.trim()).toBytes()];
+    dataHash = [
+      ...new PublicKey(asset.compression.data_hash.trim()).toBytes(),
+    ];
+    creatorHash = [
+      ...new PublicKey(asset.compression.creator_hash.trim()).toBytes(),
+    ];
+    nonce = asset.compression.leaf_id;
+    index = asset.compression.leaf_id;
+
+    // list the compressed nft
+    tx = await yardsaleProgram.methods.listCompressedNft(
+            assetIdKey,
+            root,
+            dataHash,
+            creatorHash,
+            new anchor.BN(nonce),
+            index,
+            price
+        )
+        .accounts({
+          domain: domainPda,
+          keychain: userKeychainPda,
+          listing: listingPda,
+          currency: NATIVE_MINT,
+          proceedsToken: null,
+          proceeds: payer,
+          treeAuthority,
+          leafOwner: payer,
+          merkleTree: treeAddress,
+          logWrapper: SPL_NOOP_PROGRAM_ID,
+          bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+          compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts(proofPath)
+        .transaction();
+
+    txid = await provider.sendAndConfirm(tx);
+
+    console.log('confirming list compressed NFT tx: ', txid);
+
+    await connectionWrapper.confirmTransaction(txid, "finalized");
+
+    console.log(`relisted compressed nft: ${assetId} for ${price} sol: ${txid}, owner listing pda: ${listingPda.toBase58()}`);
   });
 
   it("purchase cnft", async () => {

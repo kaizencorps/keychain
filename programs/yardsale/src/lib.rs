@@ -295,6 +295,81 @@ pub mod yardsale {
 
     }
 
+    pub fn delist_cnft<'info>(ctx: Context<'_, '_, '_, 'info, DelistCompressedNft<'info>>,
+                                root: [u8; 32],
+                                data_hash: [u8; 32],
+                                creator_hash: [u8; 32],
+                                nonce: u64,
+                                index: u32,) -> Result<()> {
+
+        msg!("attempting to delist nft {} from tree {} to new owner {}", index, ctx.accounts.merkle_tree.key(), ctx.accounts.authority.key());
+
+        let listing = &ctx.accounts.listing;
+
+        // transfer the cnft out
+
+        let mut accounts = create_cnft_transfer_accounts(
+            ctx.accounts.tree_authority.key(),
+            listing.key(),
+            ctx.accounts.authority.key(),
+            ctx.accounts.merkle_tree.key(),
+            ctx.accounts.log_wrapper.key(),
+            ctx.accounts.compression_program.key(),
+            ctx.accounts.system_program.key(),
+        );
+
+        let cnft_transfer_data = create_cnft_transfer_data(
+            root,
+            data_hash,
+            creator_hash,
+            nonce,
+            index,
+        );
+
+        let mut account_infos: Vec<AccountInfo> = vec![
+            ctx.accounts.tree_authority.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.authority.to_account_info(),
+            ctx.accounts.merkle_tree.to_account_info(),
+            ctx.accounts.log_wrapper.to_account_info(),
+            ctx.accounts.compression_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ];
+
+        // add "accounts" (hashes) that make up the merkle proof
+        for acc in ctx.remaining_accounts.iter() {
+            accounts.push(AccountMeta::new_readonly(acc.key(), false));
+            account_infos.push(acc.to_account_info());
+        }
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: ctx.accounts.bubblegum_program.key(),
+            accounts,
+            data: cnft_transfer_data,
+        };
+
+        // msg!("manual cpi call to bubblegum program transfer instruction");
+
+        let listing = &ctx.accounts.listing;
+        let seeds = &[
+            listing.item.as_ref(),
+            LISTINGS.as_bytes().as_ref(),
+            listing.keychain.as_bytes().as_ref(),
+            listing.domain.as_bytes().as_ref(),
+            YARDSALE.as_bytes().as_ref(),
+            &[listing.bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        // call bubblegum to transfer the cnft
+        invoke_signed(&instruction, &account_infos, signer).unwrap();
+
+        // no listing_item_token to close since it's a cnft
+
+        Ok(())
+    }
+
 
     // purchase an item
     pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchaseProgrammableNft<'info>>) -> Result<()> {
@@ -420,8 +495,6 @@ pub mod yardsale {
 
         // call bubblegum to transfer the cnft
         invoke_signed(&instruction, &account_infos, signer).unwrap();
-
-        // now we can close the item listing token account
 
         // no listing_item_token to close since it's a cnft
 

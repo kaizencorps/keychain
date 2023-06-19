@@ -215,7 +215,6 @@ pub struct ListCompressedNft<'info> {
     #[account()]
     pub proceeds: Option<AccountInfo<'info>>,
 
-
     // tree stuff
     #[account(
         seeds = [merkle_tree.key().as_ref()],
@@ -381,6 +380,48 @@ pub struct ListProgrammableNft<'info> {
 
     // ruleset is passed in w/remaining accounts
 }
+
+#[derive(Accounts)]
+pub struct DelistCompressedNft<'info> {
+
+    #[account(
+        mut,
+        constraint = listing.domain == keychain.domain && listing.keychain == keychain.name,
+        close = authority,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    #[account(
+        constraint = keychain.has_key(&authority.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    // tree stuff
+    #[account(
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key(),
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Box<Account<'info, TreeConfig>>,
+
+    #[account(
+        mut,
+        owner = compression_program.key()
+    )]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub system_program: Program<'info, System>,
+}
+
+
 
 #[derive(Accounts)]
 pub struct DelistPNFT<'info> {
