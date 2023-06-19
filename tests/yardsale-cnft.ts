@@ -16,7 +16,7 @@ import {
   createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync,
   NATIVE_MINT,
-  TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID, transfer,
 } from "@solana/spl-token";
 import {expect} from "chai";
 
@@ -36,7 +36,9 @@ import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bub
 
 
 
-///// since this works with cnfts, needs to be done on devnet
+///// since this works with cnfts, needs to be done on devnet w/helius (or das supported rpc)
+
+/// this test expects a tree it can mint from to be set up already using messhall/compression/createTree
 
 function randomName() {
   let name = Math.random().toString(36).substring(2, 5) + Math.random().toString(36).substring(2, 5);
@@ -47,7 +49,7 @@ function randomName() {
 // const domain = randomName();
 const domain = 'testdomain1';
 const stacheid = 'test123';
-const treasury = anchor.web3.Keypair.generate();
+let treasury = anchor.web3.Keypair.generate().publicKey;
 const renameCost = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
 
 let currencyMint: Keypair = null;
@@ -56,6 +58,7 @@ let sellerCurrencyTokenAcct: PublicKey = null;
 let txid;
 let tx;
 let assetId;
+let buyer: Keypair = Keypair.generate();
 
 describe("yardsale compressed NFTs", () => {
   let provider = anchor.AnchorProvider.env();
@@ -183,7 +186,7 @@ describe("yardsale compressed NFTs", () => {
         domainState: domainStatePda,
         authority: provider.wallet.publicKey,
         systemProgram: SystemProgram.programId,
-        treasury: treasury.publicKey
+        treasury: treasury
       }).transaction();
 
       txid = await provider.sendAndConfirm(tx);
@@ -270,12 +273,10 @@ describe("yardsale compressed NFTs", () => {
     const nonce = asset.compression.leaf_id;
     const index = asset.compression.leaf_id;
 
-    const listingName = assetIdKey.toBase58().slice(0, 16);
-
     let [listingPda] = findListingPda(assetIdKey, stacheid, domain, yardsaleProgram.programId);
 
     console.log('creating compressed nft listing w/listingPda: ', listingPda.toBase58());
-    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.0001);
+    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.00001);
 
     console.log('bubblegumprogram: ', BUBBLEGUM_PROGRAM_ID.toBase58());
     console.log('spl account compression program: ', SPL_ACCOUNT_COMPRESSION_PROGRAM_ID.toBase58());
@@ -300,6 +301,9 @@ describe("yardsale compressed NFTs", () => {
           domain: domainPda,
           keychain: userKeychainPda,
           listing: listingPda,
+          currency: NATIVE_MINT,
+          proceedsToken: null,
+          proceeds: payer,
           treeAuthority,
           leafOwner: payer,
           merkleTree: treeAddress,
@@ -329,7 +333,123 @@ describe("yardsale compressed NFTs", () => {
         });
 
     console.log('listing pda assets: ', rpcResp);
+    expect(rpcResp.total).to.equal(1);
+    expect(rpcResp.items.length).to.equal(1);
+    expect(rpcResp.items[0].id === assetId, "listing pda should have assetId");
 
+    // get the listing and make sure the asset id is the item
+    let listingAccount = await yardsaleProgram.account.listing.fetch(listingPda);
+    console.log('listing account: ', listingAccount);
+    expect(listingAccount.item.toBase58()).to.equal(assetId);
+    // there's no item token, so it just gets set to the asset id too
+    expect(listingAccount.itemToken.toBase58()).to.equal(assetId);
+    expect(listingAccount.price.toNumber()).to.equal(price.toNumber());
+    expect(listingAccount.currency.toBase58()).to.equal(NATIVE_MINT.toBase58());
+    expect(listingAccount.proceeds.toBase58()).to.equal(payer.toBase58());
+    expect('compressed' in listingAccount.itemType, 'item type should be compressed');
+
+    // set the proper treasury to be used for purchasing below
+    treasury = listingAccount.treasury;
+  });
+
+  it("purchase cnft", async () => {
+
+    // transfer some sol to the buyer
+    let transferAmount =
+        anchor.web3.LAMPORTS_PER_SOL * 0.0001 + (await connectionWrapper.getMinimumBalanceForRentExemption(0));
+
+    let tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: provider.wallet.publicKey,
+          toPubkey: buyer.publicKey,
+          lamports: transferAmount,
+        })
+    );
+    let txid = await provider.sendAndConfirm(tx, [], {commitment: "finalized"});
+
+    // now get the tree info for the purchase
+    let assetIdKey = new PublicKey(assetId);
+
+    // some of this stuff is redundant from the previous test, but demoing how to do it
+    let asset = await connectionWrapper.getAsset(assetIdKey);
+    console.log('fetched asset: ', asset);
+    let assetProof = await connectionWrapper.getAssetProof(assetIdKey);
+    let treeAddress = new PublicKey(asset.compression.tree)
+    let treeAccount = await ConcurrentMerkleTreeAccount.fromAccountAddress(
+        connectionWrapper,
+        treeAddress
+    );
+    const treeAuthority = treeAccount.getAuthority();
+
+    const canopyDepth = treeAccount.getCanopyDepth();
+
+    // get "proof path" from asset proof, these are the accounts that need to be passed to the program as remaining accounts
+    // may also be empty if tree is small enough, and canopy depth is large enough
+    const proofPath: AccountMeta[] = assetProof.proof
+        .map((node: string) => ({
+          pubkey: new PublicKey(node),
+          isSigner: false,
+          isWritable: false,
+        }))
+        .slice(0, assetProof.proof.length - (!!canopyDepth ? canopyDepth : 0))
+
+    console.log(`canopy depth: ${canopyDepth}, asset proof.proof.length: ${assetProof.proof.length}. proof path length: ${proofPath.length}`);
+
+    // get root, data hash, creator hash, nonce, and index from asset and asset proof
+    const root = [...new PublicKey(assetProof.root.trim()).toBytes()];
+    const dataHash = [
+      ...new PublicKey(asset.compression.data_hash.trim()).toBytes(),
+    ];
+    const creatorHash = [
+      ...new PublicKey(asset.compression.creator_hash.trim()).toBytes(),
+    ];
+    const nonce = asset.compression.leaf_id;
+    const index = asset.compression.leaf_id;
+
+    let [listingPda] = findListingPda(assetIdKey, stacheid, domain, yardsaleProgram.programId);
+
+    // now buyer can make the purchase
+    tx = await yardsaleProgram.methods.purchaseCnft(root, dataHash, creatorHash, new anchor.BN(nonce), index).accounts( {
+          listing: listingPda,
+        treasury,
+        currency: NATIVE_MINT,
+        proceedsToken: null,
+        proceeds: payer,
+        buyerCurrencyToken: null,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        treeAuthority,
+          merkleTree: treeAddress,
+          logWrapper: SPL_NOOP_PROGRAM_ID,
+          bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
+          compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        newLeafOwner: buyer.publicKey,
+      })
+        .remainingAccounts(proofPath)
+        .transaction();
+
+    txid = await provider.sendAndConfirm(tx, [buyer]);
+
+    console.log('confirming list compressed NFT tx: ', txid);
+
+    await connectionWrapper.confirmTransaction(txid, "finalized");
+
+    console.log(`purchased compressed nft: ${assetId}: ${txid}, owner listing pda: ${listingPda.toBase58()}`);
+
+    // check listing pda is gone
+    let listing = await yardsaleProgram.account.listing.fetchNullable(listingPda);
+    expect(listing).to.be.null;
+
+    // check that the nft is in the buyer's account
+    let rpcResp = await connectionWrapper
+        .getAssetsByOwner({
+          ownerAddress: buyer.publicKey.toBase58(),
+        });
+
+    console.log('buyer pda assets: ', rpcResp);
+    expect(rpcResp.total).to.equal(1);
+    expect(rpcResp.items.length).to.equal(1);
+    expect(rpcResp.items[0].id === assetId, "buyer should have the cNFT");
 
   });
 

@@ -201,6 +201,21 @@ pub struct ListCompressedNft<'info> {
     )]
     pub listing: Box<Account<'info, Listing>>,
 
+    // the currency the listing is being sold for - native mint should be acceptable
+    #[account()]
+    pub currency: Account<'info, Mint>,
+
+    // the token account to deposit the proceeds into - necessary if currency is spl
+    #[account(
+    token::mint = currency,
+    )]
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: this is only specified if the currency is native (will usually just be the authority, but can be any account to send proceeds to)
+    #[account()]
+    pub proceeds: Option<AccountInfo<'info>>,
+
+
     // tree stuff
     #[account(
         seeds = [merkle_tree.key().as_ref()],
@@ -210,7 +225,10 @@ pub struct ListCompressedNft<'info> {
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Box<Account<'info, TreeConfig>>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = compression_program.key()
+    )]
     /// CHECK: This account is modified in the downstream program
     pub merkle_tree: UncheckedAccount<'info>,
 
@@ -221,20 +239,6 @@ pub struct ListCompressedNft<'info> {
 
     #[account(mut)]
     pub leaf_owner: Signer<'info>, // seller
-
-    // the currency the listing is being sold for - native mint should be acceptable
-    #[account()]
-    pub currency: Account<'info, Mint>,
-
-    // the token account to deposit the proceeds into - necessary if currency is spl
-    #[account(
-        token::mint = currency,
-    )]
-    pub proceeds_token: Option<Account<'info, TokenAccount>>,
-
-    /// CHECK: this is only specified if the currency is native (will usually just be the authority, but can be any account to send proceeds to)
-    #[account()]
-    pub proceeds: Option<AccountInfo<'info>>,
 
 }
 
@@ -641,12 +645,10 @@ pub struct PurchaseProgrammableNft<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(asset_id: Pubkey)]
 pub struct PurchaseCompressedNft<'info> {
 
     #[account(
         mut,
-        constraint = listing.item == asset_id,
         close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
@@ -658,16 +660,49 @@ pub struct PurchaseCompressedNft<'info> {
     )]
     pub treasury: AccountInfo<'info>,
 
+    #[account(
+        constraint = listing.currency == currency.key(),
+    )]
+    pub currency: Account<'info, Mint>,
+
+    // needed if the currency is spl
+    #[account(
+        mut,
+        token::mint = currency,
+        constraint = listing.proceeds == proceeds_token.key(),
+    )]
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: this is only specified if the currency is native
+    #[account(
+        mut,
+        constraint = listing.proceeds == proceeds.key(),
+    )]
+    pub proceeds: Option<AccountInfo<'info>>,
+
+    // needed if the currency is spl: this is the buyer's token account
+    #[account(
+        mut,
+        token::mint = currency,
+        token::authority = new_leaf_owner
+    )]
+    pub buyer_currency_token: Option<Account<'info, TokenAccount>>,
+
+    pub token_program: Program<'info, Token>,
+
     // tree stuff
     #[account(
-    seeds = [merkle_tree.key().as_ref()],
-    bump,
-    seeds::program = bubblegum_program.key(),
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
-    pub tree_authority: Account<'info, TreeConfig>,
+    pub tree_authority: Box<Account<'info, TreeConfig>>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = compression_program.key()
+    )]
     /// CHECK: This account is modified in the downstream program
     pub merkle_tree: UncheckedAccount<'info>,
 
@@ -677,7 +712,7 @@ pub struct PurchaseCompressedNft<'info> {
     pub system_program: Program<'info, System>,
 
     #[account(mut)]
-    pub leaf_owner: Signer<'info>, // seller
+    pub new_leaf_owner: Signer<'info>, //  buyer
 }
 
 

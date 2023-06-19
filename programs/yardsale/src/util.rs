@@ -411,6 +411,7 @@ pub fn close_listing_owned_account<'info>(
     Ok(())
 }
 
+// properly populate a newly created listing account
 pub fn create_listing(listing: &mut Box<Account<Listing>>,
                   listing_bump: u8,
                   item: Pubkey,
@@ -431,7 +432,7 @@ pub fn create_listing(listing: &mut Box<Account<Listing>>,
     listing.currency = currency;
     listing.bump = listing_bump;
     listing.treasury = treasury;
-    listing.item_type = ItemType::Programmable;
+    listing.item_type = item_type;
 
     if listing.currency == NATIVE_MINT {
         // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
@@ -445,3 +446,47 @@ pub fn create_listing(listing: &mut Box<Account<Listing>>,
     Ok(())
 }
 
+// get all the accounts needed to call the bubblegum program w/transfer instruction
+pub fn create_cnft_transfer_accounts(tree_authority: Pubkey,
+                                     leaf_owner: Pubkey,
+                                     new_leaf_owner: Pubkey,
+                                     merkle_tree: Pubkey,
+                                     log_wrapper_program: Pubkey,
+                                     compression_program: Pubkey,
+                                     system_program: Pubkey) -> Vec<AccountMeta> {
+    let accounts:  Vec<solana_program::instruction::AccountMeta> = vec![
+        AccountMeta::new_readonly(tree_authority, false),
+        AccountMeta::new_readonly(leaf_owner, true),
+        AccountMeta::new_readonly(leaf_owner, false),
+        AccountMeta::new_readonly(new_leaf_owner, false),
+        AccountMeta::new(merkle_tree, false),
+        AccountMeta::new_readonly(log_wrapper_program, false),
+        AccountMeta::new_readonly(compression_program, false),
+        AccountMeta::new_readonly(system_program, false),
+    ];
+    return accounts;
+}
+
+pub fn create_cnft_transfer_data(
+    root: [u8; 32],
+    data_hash: [u8; 32],
+    creator_hash: [u8; 32],
+    nonce: u64,
+    index: u32,
+) -> Vec<u8> {
+    let mut data = Vec::with_capacity(
+        8           // The length of transfer_discriminator,
+            + root.len()
+            + data_hash.len()
+            + creator_hash.len()
+            + 8 // The length of the nonce
+            + 8, // The length of the index
+    );
+    data.extend(TRANSFER_DISCRIMINATOR);
+    data.extend(root);
+    data.extend(data_hash);
+    data.extend(creator_hash);
+    data.extend(nonce.to_le_bytes());
+    data.extend(index.to_le_bytes());
+    return data;
+}
