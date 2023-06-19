@@ -410,3 +410,38 @@ pub fn close_listing_owned_account<'info>(
 
     Ok(())
 }
+
+pub fn create_listing(listing: &mut Box<Account<Listing>>,
+                  listing_bump: u8,
+                  item: Pubkey,
+                  listing_item_token: Pubkey,
+                  domain: String,
+                  keychain: String,
+                  currency: Pubkey,
+                  treasury: Pubkey,
+                  proceeds: &Option<AccountInfo>,
+                  proceeds_token: &Option<Account<TokenAccount>>,
+                  item_type: ItemType,
+                  price: u64) -> Result<()> {
+    listing.price = price;
+    listing.item = item;
+    listing.item_token = listing_item_token;
+    listing.domain = domain;
+    listing.keychain = keychain;
+    listing.currency = currency;
+    listing.bump = listing_bump;
+    listing.treasury = treasury;
+    listing.item_type = ItemType::Programmable;
+
+    if listing.currency == NATIVE_MINT {
+        // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
+        require!(proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+        listing.proceeds = proceeds.as_ref().unwrap().key();
+    } else {
+        // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
+        require!(proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
+        listing.proceeds = proceeds_token.as_ref().unwrap().key();
+    }
+    Ok(())
+}
+

@@ -70,28 +70,18 @@ pub mod yardsale {
         token::transfer(cpi_ctx, 1)?;
 
         // now create the listing
-        let listing = &mut ctx.accounts.listing;
-        listing.price = price;
-        listing.item = ctx.accounts.item.key();
-        listing.item_token = ctx.accounts.listing_item_token.key();
-        listing.domain = ctx.accounts.keychain.domain.clone();
-        listing.keychain = ctx.accounts.keychain.name.clone();
-        listing.currency = ctx.accounts.currency.key();
-        listing.bump = *ctx.bumps.get("listing").unwrap();
-        listing.treasury = ctx.accounts.domain.treasury.key();
-        listing.item_type = ItemType::Standard;
-
-        if listing.currency == NATIVE_MINT {
-            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
-        } else {
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
-        }
-
+        create_listing(&mut ctx.accounts.listing,
+                       *ctx.bumps.get("listing").unwrap(),
+                       ctx.accounts.item.key(),
+                       ctx.accounts.listing_item_token.key(),
+                       ctx.accounts.keychain.domain.clone(),
+                       ctx.accounts.keychain.name.clone(),
+                       ctx.accounts.currency.key(),
+                       ctx.accounts.domain.treasury.key(),
+                       &ctx.accounts.proceeds,
+                       &ctx.accounts.proceeds_token,
+                       ItemType::Standard,
+                       price)?;
         Ok(())
     }
 
@@ -164,6 +154,20 @@ pub mod yardsale {
             &instruction,
             &account_infos[..])?;
 
+        create_listing(&mut ctx.accounts.listing,
+                       *ctx.bumps.get("listing").unwrap(),
+                       asset_id.clone(),
+                       // cnfts don't have token accounts, so we'll just dupe the asset_id here
+                       asset_id.clone(),
+                       ctx.accounts.keychain.domain.clone(),
+                       ctx.accounts.keychain.name.clone(),
+                       ctx.accounts.currency.key(),
+                       ctx.accounts.domain.treasury.key(),
+                       &ctx.accounts.proceeds,
+                       &ctx.accounts.proceeds_token,
+                       ItemType::Standard,
+                       price)?;
+
         Ok(())
 
     }
@@ -206,28 +210,18 @@ pub mod yardsale {
             None
         )?;
 
-        // now create the listing
-        let listing = &mut ctx.accounts.listing;
-        listing.price = price;
-        listing.item = ctx.accounts.item.key();
-        listing.item_token = ctx.accounts.listing_item_token.key();
-        listing.domain = ctx.accounts.keychain.domain.clone();
-        listing.keychain = ctx.accounts.keychain.name.clone();
-        listing.currency = ctx.accounts.currency.key();
-        listing.bump = *ctx.bumps.get("listing").unwrap();
-        listing.treasury = ctx.accounts.domain.treasury.key();
-        listing.item_type = ItemType::Programmable;
-
-        if listing.currency == NATIVE_MINT {
-            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
-        } else {
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
-        }
+        create_listing(&mut ctx.accounts.listing,
+                       *ctx.bumps.get("listing").unwrap(),
+                       ctx.accounts.item.key(),
+                       ctx.accounts.listing_item_token.key(),
+                       ctx.accounts.keychain.domain.clone(),
+                       ctx.accounts.keychain.name.clone(),
+                       ctx.accounts.currency.key(),
+                       ctx.accounts.domain.treasury.key(),
+                       &ctx.accounts.proceeds,
+                       &ctx.accounts.proceeds_token,
+                       ItemType::Programmable,
+                       price)?;
 
         Ok(())
     }

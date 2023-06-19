@@ -48,7 +48,7 @@ pub struct Listing {
     pub treasury: Pubkey,
 
     pub item: Pubkey,
-    pub item_token: Pubkey,     // not used if listing is a c_nft
+    pub item_token: Pubkey,     // not used if listing is a c_nft - just set to item
 
     pub price: u64,
     // none if priced in sol

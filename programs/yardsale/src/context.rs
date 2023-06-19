@@ -208,10 +208,7 @@ pub struct ListCompressedNft<'info> {
         seeds::program = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
-    pub tree_authority: Account<'info, TreeConfig>,
-
-
-
+    pub tree_authority: Box<Account<'info, TreeConfig>>,
 
     #[account(mut)]
     /// CHECK: This account is modified in the downstream program
@@ -224,6 +221,21 @@ pub struct ListCompressedNft<'info> {
 
     #[account(mut)]
     pub leaf_owner: Signer<'info>, // seller
+
+    // the currency the listing is being sold for - native mint should be acceptable
+    #[account()]
+    pub currency: Account<'info, Mint>,
+
+    // the token account to deposit the proceeds into - necessary if currency is spl
+    #[account(
+        token::mint = currency,
+    )]
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: this is only specified if the currency is native (will usually just be the authority, but can be any account to send proceeds to)
+    #[account()]
+    pub proceeds: Option<AccountInfo<'info>>,
+
 }
 
 #[derive(Accounts)]
@@ -628,6 +640,47 @@ pub struct PurchaseProgrammableNft<'info> {
     pub ruleset: Option<UncheckedAccount<'info>>,
 }
 
+#[derive(Accounts)]
+#[instruction(asset_id: Pubkey)]
+pub struct PurchaseCompressedNft<'info> {
+
+    #[account(
+        mut,
+        constraint = listing.item == asset_id,
+        close = treasury,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    /// CHECK: just sending lamports here when closing the listing
+    #[account(
+        mut,
+        constraint = listing.treasury == treasury.key(),
+    )]
+    pub treasury: AccountInfo<'info>,
+
+    // tree stuff
+    #[account(
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key(),
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Account<'info, TreeConfig>,
+
+    #[account(mut)]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub system_program: Program<'info, System>,
+
+    #[account(mut)]
+    pub leaf_owner: Signer<'info>, // seller
+}
+
+
 
 #[derive(Accounts)]
 pub struct PurchaseItem<'info> {
@@ -700,34 +753,5 @@ pub struct PurchaseItem<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program <'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct PurchaseCompressedNft<'info> {
-
-    #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key()
-    )]
-    /// CHECK: This account is neither written to nor read from.
-    pub tree_authority: Account<'info, TreeConfig>,
-
-    #[account(
-        seeds = [b"cNFT-vault"],
-        bump,
-    )]
-    /// CHECK: This account doesnt even exist (it is just the pda to sign)
-    pub leaf_owner: UncheckedAccount<'info>, // sender (the vault in our case)
-    /// CHECK: This account is neither written to nor read from.
-    pub new_leaf_owner: UncheckedAccount<'info>, // receiver
-    #[account(mut)]
-    /// CHECK: This account is modified in the downstream program
-    pub merkle_tree: UncheckedAccount<'info>,
-
-    pub log_wrapper: Program<'info, Noop>,
-    pub compression_program: Program<'info, SplAccountCompression>,
-    pub bubblegum_program: Program<'info, MplBubblegum>,
-    pub system_program: Program<'info, System>,
 }
 
