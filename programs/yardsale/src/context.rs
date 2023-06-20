@@ -16,30 +16,15 @@ use mpl_bubblegum::state::TreeConfig;
 #[derive(Clone)]
 pub struct MplBubblegum;
 
+use spl_account_compression::{
+    Noop
+};
+
 impl anchor_lang::Id for MplBubblegum {
     fn id() -> Pubkey {
         mpl_bubblegum::id()
     }
 }
-
-// not sure why the use spl_account_compression::Noop/SplAccountCompression IDs don't work
-// maybe cause the solana-program ids and stuff
-/*use spl_account_compression::{
-    program::SplAccountCompression, Noop,
-};
-*/
-
-// const NOOP_PROGRAM_ID: Pubkey = Pubkey::from_str("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV").unwrap();
-
-#[derive(Clone)]
-pub struct Noop;
-
-impl anchor_lang::Id for Noop {
-    fn id() -> Pubkey {
-        Pubkey::from_str("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV").unwrap()
-    }
-}
-
 
 #[derive(Clone)]
 pub struct SplAccountCompression;

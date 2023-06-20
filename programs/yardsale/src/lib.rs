@@ -14,17 +14,11 @@ use mpl_token_metadata::{
     state::{Metadata, ProgrammableConfig::V1, TokenMetadataAccount, TokenStandard},
 };
 
-// compression
-// use spl_account_compression::{
-//     program::SplAccountCompression, Noop,
-// };
-
-
 // "prod" / staging address
-// declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
+declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
 
 // "pnft" devnet address
-declare_id!("xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W");
+// declare_id!("xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W");
 
 pub mod error;
 pub mod account;
