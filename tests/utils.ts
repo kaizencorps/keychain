@@ -130,7 +130,7 @@ export async function createNFT(provider: Provider): Promise<Keypair> {
   return mint;
 }
 
-export async function createpNFT(provider: AnchorProvider): Promise<PublicKey> {
+export async function createpNFT(provider: AnchorProvider, ruleSet: PublicKey | null = null): Promise<PublicKey> {
 
   const metaplex = Metaplex.make(provider.connection).use(walletAdapterIdentity(provider.wallet as WalletAdapter));
 
@@ -147,16 +147,22 @@ export async function createpNFT(provider: AnchorProvider): Promise<PublicKey> {
     isMutable: true,
     isCollection: false,
     tokenStandard: TokenStandard.ProgrammableNonFungible,
-    ruleSet: null
+    ruleSet: ruleSet
   });
 
   // let txid = await provider.sendAndConfirm(txBuilder.toTransaction(await constructBlockhashWithExpiryBlockHeight(provider.connection)));
   let {signature, confirmResponse} = await metaplex.rpc().sendAndConfirmTransaction(txBuilder);
 
-
   const { mintAddress } = txBuilder.getContext();
   console.log(`   pNFT mint Success!🎉`);
   console.log(`   Mint Address: ${mintAddress.toString()}, txid: ${signature}`);
+
+  if (ruleSet) {
+    console.log(`   RuleSet: ${ruleSet.toString()} `);
+  } else {
+    console.log(`   RuleSet: None`);
+  }
+
   console.log(`   Minted NFT: https://explorer.solana.com/address/${mintAddress.toString()}?cluster=devnet`);
   console.log(`   Tx: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
   return mintAddress;

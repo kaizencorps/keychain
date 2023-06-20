@@ -270,7 +270,7 @@ pub fn tranfer_pnft_from_pda<'info>(
     edition: &AccountInfo<'info>,
     buyer_token_record: &UncheckedAccount<'info>,
     listing_token_record: &UncheckedAccount<'info>,
-    ruleset: &UncheckedAccount<'info>,
+    ruleset: &Option<UncheckedAccount<'info>>,
     authorization_rules_program: &UncheckedAccount<'info>,
     token_metadata_program: &UncheckedAccount<'info>,
     instructions: &UncheckedAccount<'info>,
@@ -315,10 +315,18 @@ pub fn tranfer_pnft_from_pda<'info>(
         .edition(edition.key())
         .owner_token_record(listing_token_record.key())
         .destination_token_record(buyer_token_record.key())
-        // this works without specifying ruleset (guess cause the default gets used?)
-        .authorization_rules(ruleset.key())
         .authorization_rules_program(authorization_rules_program.key())
         .payer(buyer.key());
+
+    // ruleset is optional
+    let ruleset_account_info;
+    if let Some(ruleset) = ruleset {
+        builder.authorization_rules(ruleset.key());
+        ruleset_account_info = ruleset.to_account_info();
+    } else {
+        // per pnft guide, set the ruleset to the token metadata program if it's not provided/needed
+        ruleset_account_info = token_metadata_program.to_account_info();
+    }
 
     msg!("building transfer instruction");
     let build_result = builder.build(transfer_args);
@@ -334,6 +342,8 @@ pub fn tranfer_pnft_from_pda<'info>(
         }
     };
 
+    // these SHOULD be the transfer instructions but the ordering is based on the
+    // rooster program, and DOESN"T match the order of the transfer instructions in the tm program
     let account_infos = [
         listing.to_account_info(),
         listing_item_token.to_account_info(),
@@ -344,8 +354,7 @@ pub fn tranfer_pnft_from_pda<'info>(
         edition.to_account_info(),
         listing_token_record.to_account_info(),
         buyer_token_record.to_account_info(),
-        // not sure if this ruleset doesn't need to be specified...
-        ruleset.to_account_info(),
+        ruleset_account_info,
         listing.to_account_info(),
         token_metadata_program.to_account_info(),
         system_program.to_account_info(),
@@ -400,4 +409,84 @@ pub fn close_listing_owned_account<'info>(
     token::close_account(cpi_ctx)?;
 
     Ok(())
+}
+
+// properly populate a newly created listing account
+pub fn create_listing(listing: &mut Box<Account<Listing>>,
+                  listing_bump: u8,
+                  item: Pubkey,
+                  listing_item_token: Pubkey,
+                  domain: String,
+                  keychain: String,
+                  currency: Pubkey,
+                  treasury: Pubkey,
+                  proceeds: &Option<AccountInfo>,
+                  proceeds_token: &Option<Account<TokenAccount>>,
+                  item_type: ItemType,
+                  price: u64) -> Result<()> {
+    listing.price = price;
+    listing.item = item;
+    listing.item_token = listing_item_token;
+    listing.domain = domain;
+    listing.keychain = keychain;
+    listing.currency = currency;
+    listing.bump = listing_bump;
+    listing.treasury = treasury;
+    listing.item_type = item_type;
+
+    if listing.currency == NATIVE_MINT {
+        // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
+        require!(proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
+        listing.proceeds = proceeds.as_ref().unwrap().key();
+    } else {
+        // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
+        require!(proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
+        listing.proceeds = proceeds_token.as_ref().unwrap().key();
+    }
+    Ok(())
+}
+
+// get all the accounts needed to call the bubblegum program w/transfer instruction
+pub fn create_cnft_transfer_accounts(tree_authority: Pubkey,
+                                     leaf_owner: Pubkey,
+                                     new_leaf_owner: Pubkey,
+                                     merkle_tree: Pubkey,
+                                     log_wrapper_program: Pubkey,
+                                     compression_program: Pubkey,
+                                     system_program: Pubkey) -> Vec<AccountMeta> {
+    let accounts:  Vec<solana_program::instruction::AccountMeta> = vec![
+        AccountMeta::new_readonly(tree_authority, false),
+        AccountMeta::new_readonly(leaf_owner, true),
+        AccountMeta::new_readonly(leaf_owner, false),
+        AccountMeta::new_readonly(new_leaf_owner, false),
+        AccountMeta::new(merkle_tree, false),
+        AccountMeta::new_readonly(log_wrapper_program, false),
+        AccountMeta::new_readonly(compression_program, false),
+        AccountMeta::new_readonly(system_program, false),
+    ];
+    return accounts;
+}
+
+pub fn create_cnft_transfer_data(
+    root: [u8; 32],
+    data_hash: [u8; 32],
+    creator_hash: [u8; 32],
+    nonce: u64,
+    index: u32,
+) -> Vec<u8> {
+    let mut data = Vec::with_capacity(
+        8           // The length of transfer_discriminator,
+            + root.len()
+            + data_hash.len()
+            + creator_hash.len()
+            + 8 // The length of the nonce
+            + 8, // The length of the index
+    );
+    data.extend(TRANSFER_DISCRIMINATOR);
+    data.extend(root);
+    data.extend(data_hash);
+    data.extend(creator_hash);
+    data.extend(nonce.to_le_bytes());
+    data.extend(index.to_le_bytes());
+    return data;
 }

@@ -202,10 +202,14 @@ pub mod keychain {
                 // perform the pending action
                 match pending_action.action_type {
                     KeyChainActionType::AddKey => {
-                        // make sure the key has been verified - this makes sure the keychain_key account exists
-                        require!(pending_action.verified, KeychainError::KeyNotVerified);
-                        // add the key
-                        keychain.add_key(pending_action.key);
+                        // this would require us to verify first
+                        // require!(pending_action.verified, KeychainError::KeyNotVerified);
+
+                        // if the key has already been verified, then we add it to the keychain and clear the pending action
+                        if pending_action.verified {
+                            keychain.add_key(pending_action.key);
+                            ctx.accounts.keychain_state.pending_action = None;
+                        }
                     },
                     KeyChainActionType::RemoveKey => {
                         // remove the key - in this case we need to have been passed in the keychain_key account
@@ -215,11 +219,10 @@ pub mod keychain {
                         // close the keychain_key account - send lamports back to the signer
                         let keychain_key = ctx.accounts.keychain_key.as_mut().unwrap();
                         keychain_key.close(ctx.accounts.authority.to_account_info())?;
+                        // clear the pending action
+                        ctx.accounts.keychain_state.pending_action = None;
                     },
                 }
-
-                // clear the pending action
-                ctx.accounts.keychain_state.pending_action = None;
             }
         }
 

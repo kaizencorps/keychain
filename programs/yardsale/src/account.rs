@@ -3,6 +3,13 @@ use mpl_token_auth_rules::payload::{Payload, PayloadType, ProofInfo, SeedsVec};
 use mpl_token_metadata::processor::AuthorizationData;
 use crate::error::YardsaleError;
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
+pub enum ItemType {
+    Standard,
+    Programmable,
+    Compressed
+}
+
 #[account]
 pub struct Listing {
 
@@ -17,19 +24,20 @@ pub struct Listing {
     pub treasury: Pubkey,
 
     pub item: Pubkey,
-    pub item_token: Pubkey,
+    pub item_token: Pubkey,     // not used if listing is a c_nft - just set to item
 
     pub price: u64,
     // none if priced in sol
     pub currency: Pubkey,
     pub proceeds: Pubkey,     // token account if currency = spl or just account if currency = sol
+    pub item_type: ItemType,
 
 }
 
 impl Listing {
     pub const MAX_SIZE: usize =
         1 + // bump
-        32 + // domain
+            32 + // domain
             32 + // keychain
             32 + // treasury
             32 + // mint
@@ -37,8 +45,10 @@ impl Listing {
             8 + // price
             32 + // currency
             32 + // proceeds account (token account or regular if sol = currency)
-            192; // extra space
+            1 + // item type
+            191; // extra space
 }
+
 
 
 // --------------------------------------- replicating mplex type for anchor IDL export

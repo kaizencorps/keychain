@@ -157,6 +157,7 @@ export class PnftHelper {
     });
     const remainingAccounts = [];
     if (ruleSet) {
+      console.log(`>> adding ruleSet to listpnft method: ${ruleSet.toBase58()}`);
       remainingAccounts.push({
         pubkey: ruleSet,
         isSigner: false,
@@ -171,6 +172,7 @@ export class PnftHelper {
     console.log(`>> authorityItemToken: ${authorityItemToken.toBase58()}`);
     console.log(`>> listingItemToken: ${listingItemToken.toBase58()}`);
     console.log(`>> nftMint: ${item.toBase58()}`);
+    console.log(`>> ruleset ${ruleSet?.toBase58()}`);
 
     const builder = this.program.methods
         .listPnft(priceBN, authDataSerialized, !!ruleSet)
@@ -196,9 +198,8 @@ export class PnftHelper {
           tokenMetadataProgram: TMETA_PROG_ID,
           instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
           authorizationRulesProgram: AUTH_PROG_ID,
-        });
-
-        // .remainingAccounts(remainingAccounts);
+        })
+        .remainingAccounts(remainingAccounts);
 
     return builder
   }

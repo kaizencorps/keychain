@@ -14,11 +14,17 @@ use mpl_token_metadata::{
     state::{Metadata, ProgrammableConfig::V1, TokenMetadataAccount, TokenStandard},
 };
 
+// compression
+// use spl_account_compression::{
+//     program::SplAccountCompression, Noop,
+// };
+
+
 // "prod" / staging address
 // declare_id!("yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1");
 
 // "pnft" devnet address
-declare_id!("dYaMxY3mLDYRQV68tgiV7gfPUC4eNzvEjvrDYSy4itq");
+declare_id!("xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W");
 
 pub mod error;
 pub mod account;
@@ -34,6 +40,7 @@ use util::*;
 
 #[program]
 pub mod yardsale {
+    use anchor_lang::solana_program;
     use anchor_lang::solana_program::program::invoke;
     use anchor_lang::solana_program::system_instruction;
     use mpl_token_auth_rules::payload::{Payload, PayloadType, SeedsVec};
@@ -63,32 +70,100 @@ pub mod yardsale {
         token::transfer(cpi_ctx, 1)?;
 
         // now create the listing
-        let listing = &mut ctx.accounts.listing;
-        listing.price = price;
-        listing.item = ctx.accounts.item.key();
-        listing.item_token = ctx.accounts.listing_item_token.key();
-        listing.domain = ctx.accounts.keychain.domain.clone();
-        listing.keychain = ctx.accounts.keychain.name.clone();
-        listing.currency = ctx.accounts.currency.key();
-        listing.bump = *ctx.bumps.get("listing").unwrap();
-        listing.treasury = ctx.accounts.domain.treasury.key();
-
-        if listing.currency == NATIVE_MINT {
-            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
-        } else {
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
-        }
-
+        create_listing(&mut ctx.accounts.listing,
+                       *ctx.bumps.get("listing").unwrap(),
+                       ctx.accounts.item.key(),
+                       ctx.accounts.listing_item_token.key(),
+                       ctx.accounts.keychain.domain.clone(),
+                       ctx.accounts.keychain.name.clone(),
+                       ctx.accounts.currency.key(),
+                       ctx.accounts.domain.treasury.key(),
+                       &ctx.accounts.proceeds,
+                       &ctx.accounts.proceeds_token,
+                       ItemType::Standard,
+                       price)?;
         Ok(())
     }
 
+    pub fn list_compressed_nft<'info>(
+        ctx: Context<'_, '_, '_, 'info, ListCompressedNft<'info>>,
+        asset_id: Pubkey,
+        root: [u8; 32],
+        data_hash: [u8; 32],
+        creator_hash: [u8; 32],
+        nonce: u64,
+        index: u32,
+        price: u64,
+    ) -> Result<()> {
+
+        msg!("attempting to send nft {} from tree {} to listing {}", index, ctx.accounts.merkle_tree.key(), ctx.accounts.listing.key());
+
+        let mut accounts = create_cnft_transfer_accounts(
+            ctx.accounts.tree_authority.key(),
+            ctx.accounts.leaf_owner.key(),
+            ctx.accounts.listing.key(),
+            ctx.accounts.merkle_tree.key(),
+            ctx.accounts.log_wrapper.key(),
+            ctx.accounts.compression_program.key(),
+            ctx.accounts.system_program.key(),
+        );
+
+        let cnft_transfer_data = create_cnft_transfer_data(
+            root,
+            data_hash,
+            creator_hash,
+            nonce,
+            index,
+        );
+
+        let mut account_infos: Vec<AccountInfo> = vec![
+            ctx.accounts.tree_authority.to_account_info(),
+            ctx.accounts.leaf_owner.to_account_info(),
+            ctx.accounts.leaf_owner.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.merkle_tree.to_account_info(),
+            ctx.accounts.log_wrapper.to_account_info(),
+            ctx.accounts.compression_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ];
+
+        // add "accounts" (hashes) that make up the merkle proof
+        for acc in ctx.remaining_accounts.iter() {
+            accounts.push(AccountMeta::new_readonly(acc.key(), false));
+            account_infos.push(acc.to_account_info());
+        }
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: ctx.accounts.bubblegum_program.key(),
+            accounts,
+            data: cnft_transfer_data,
+        };
+
+        // msg!("manual cpi call to bubblegum program transfer instruction");
+        solana_program::program::invoke(
+            &instruction,
+            &account_infos[..])?;
+
+        create_listing(&mut ctx.accounts.listing,
+                       *ctx.bumps.get("listing").unwrap(),
+                       asset_id.clone(),
+                       // cnfts don't have token accounts, so we'll just dupe the asset_id here
+                       asset_id.clone(),
+                       ctx.accounts.keychain.domain.clone(),
+                       ctx.accounts.keychain.name.clone(),
+                       ctx.accounts.currency.key(),
+                       ctx.accounts.domain.treasury.key(),
+                       &ctx.accounts.proceeds,
+                       &ctx.accounts.proceeds_token,
+                       ItemType::Compressed,
+                       price)?;
+
+        Ok(())
+
+    }
+
     pub fn list_pnft<'info>(
-        ctx: Context<'_, '_, '_, 'info, ListPNFT<'info>>,
+        ctx: Context<'_, '_, '_, 'info, ListProgrammableNft<'info>>,
         price: u64,
         authorization_data: Option<AuthorizationDataLocal>,
         rules_acc_present: bool,
@@ -125,27 +200,18 @@ pub mod yardsale {
             None
         )?;
 
-        // now create the listing
-        let listing = &mut ctx.accounts.listing;
-        listing.price = price;
-        listing.item = ctx.accounts.item.key();
-        listing.item_token = ctx.accounts.listing_item_token.key();
-        listing.domain = ctx.accounts.keychain.domain.clone();
-        listing.keychain = ctx.accounts.keychain.name.clone();
-        listing.currency = ctx.accounts.currency.key();
-        listing.bump = *ctx.bumps.get("listing").unwrap();
-        listing.treasury = ctx.accounts.domain.treasury.key();
-
-        if listing.currency == NATIVE_MINT {
-            // then the sale token isn't needed, but a regular accountinfo should've been specified (wallet)
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds.is_some(), YardsaleError::ProceedsAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds.as_ref().unwrap().key();
-        } else {
-            // then the sale token is needed, but an accountinfo shouldn't have been specified (wallet)
-            require!(ctx.accounts.proceeds_token.is_some(), YardsaleError::ProceedsTokenAccountNotSpecified);
-            listing.proceeds = ctx.accounts.proceeds_token.as_ref().unwrap().key();
-        }
+        create_listing(&mut ctx.accounts.listing,
+                       *ctx.bumps.get("listing").unwrap(),
+                       ctx.accounts.item.key(),
+                       ctx.accounts.listing_item_token.key(),
+                       ctx.accounts.keychain.domain.clone(),
+                       ctx.accounts.keychain.name.clone(),
+                       ctx.accounts.currency.key(),
+                       ctx.accounts.domain.treasury.key(),
+                       &ctx.accounts.proceeds,
+                       &ctx.accounts.proceeds_token,
+                       ItemType::Programmable,
+                       price)?;
 
         Ok(())
     }
@@ -229,9 +295,84 @@ pub mod yardsale {
 
     }
 
+    pub fn delist_cnft<'info>(ctx: Context<'_, '_, '_, 'info, DelistCompressedNft<'info>>,
+                                root: [u8; 32],
+                                data_hash: [u8; 32],
+                                creator_hash: [u8; 32],
+                                nonce: u64,
+                                index: u32,) -> Result<()> {
+
+        msg!("attempting to delist nft {} from tree {} to new owner {}", index, ctx.accounts.merkle_tree.key(), ctx.accounts.authority.key());
+
+        let listing = &ctx.accounts.listing;
+
+        // transfer the cnft out
+
+        let mut accounts = create_cnft_transfer_accounts(
+            ctx.accounts.tree_authority.key(),
+            listing.key(),
+            ctx.accounts.authority.key(),
+            ctx.accounts.merkle_tree.key(),
+            ctx.accounts.log_wrapper.key(),
+            ctx.accounts.compression_program.key(),
+            ctx.accounts.system_program.key(),
+        );
+
+        let cnft_transfer_data = create_cnft_transfer_data(
+            root,
+            data_hash,
+            creator_hash,
+            nonce,
+            index,
+        );
+
+        let mut account_infos: Vec<AccountInfo> = vec![
+            ctx.accounts.tree_authority.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.authority.to_account_info(),
+            ctx.accounts.merkle_tree.to_account_info(),
+            ctx.accounts.log_wrapper.to_account_info(),
+            ctx.accounts.compression_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ];
+
+        // add "accounts" (hashes) that make up the merkle proof
+        for acc in ctx.remaining_accounts.iter() {
+            accounts.push(AccountMeta::new_readonly(acc.key(), false));
+            account_infos.push(acc.to_account_info());
+        }
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: ctx.accounts.bubblegum_program.key(),
+            accounts,
+            data: cnft_transfer_data,
+        };
+
+        // msg!("manual cpi call to bubblegum program transfer instruction");
+
+        let listing = &ctx.accounts.listing;
+        let seeds = &[
+            listing.item.as_ref(),
+            LISTINGS.as_bytes().as_ref(),
+            listing.keychain.as_bytes().as_ref(),
+            listing.domain.as_bytes().as_ref(),
+            YARDSALE.as_bytes().as_ref(),
+            &[listing.bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        // call bubblegum to transfer the cnft
+        invoke_signed(&instruction, &account_infos, signer).unwrap();
+
+        // no listing_item_token to close since it's a cnft
+
+        Ok(())
+    }
+
 
     // purchase an item
-    pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchasePNFT<'info>>) -> Result<()> {
+    pub fn purchase_pnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchaseProgrammableNft<'info>>) -> Result<()> {
         let listing = &ctx.accounts.listing;
 
         make_purchase(
@@ -274,7 +415,93 @@ pub mod yardsale {
         close_listing_owned_account(listing, listing_item_token, treasury, &ctx.accounts.token_program)?;
 
         Ok(())
+    }
+
+
+    pub fn purchase_cnft<'info>(ctx: Context<'_, '_, '_, 'info, PurchaseCompressedNft<'info>>,
+                                root: [u8; 32],
+                                data_hash: [u8; 32],
+                                creator_hash: [u8; 32],
+                                nonce: u64,
+                                index: u32,) -> Result<()> {
+        msg!("attempting to send nft {} from tree {} to new owner {}", index, ctx.accounts.merkle_tree.key(), ctx.accounts.new_leaf_owner.key());
+
+        let listing = &ctx.accounts.listing;
+        make_purchase(
+            listing,
+            &ctx.accounts.new_leaf_owner.to_account_info(),
+            &ctx.accounts.proceeds,
+            &ctx.accounts.proceeds_token,
+            &ctx.accounts.buyer_currency_token,
+            &ctx.accounts.system_program,
+            &ctx.accounts.token_program,
+        )?;
+
+        // now transfer the cnft
+
+        let mut accounts = create_cnft_transfer_accounts(
+            ctx.accounts.tree_authority.key(),
+            listing.key(),
+            ctx.accounts.new_leaf_owner.key(),
+            ctx.accounts.merkle_tree.key(),
+            ctx.accounts.log_wrapper.key(),
+            ctx.accounts.compression_program.key(),
+            ctx.accounts.system_program.key(),
+        );
+
+        let cnft_transfer_data = create_cnft_transfer_data(
+            root,
+            data_hash,
+            creator_hash,
+            nonce,
+            index,
+        );
+
+        let mut account_infos: Vec<AccountInfo> = vec![
+            ctx.accounts.tree_authority.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.listing.to_account_info(),
+            ctx.accounts.new_leaf_owner.to_account_info(),
+            ctx.accounts.merkle_tree.to_account_info(),
+            ctx.accounts.log_wrapper.to_account_info(),
+            ctx.accounts.compression_program.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ];
+
+        // add "accounts" (hashes) that make up the merkle proof
+        for acc in ctx.remaining_accounts.iter() {
+            accounts.push(AccountMeta::new_readonly(acc.key(), false));
+            account_infos.push(acc.to_account_info());
+        }
+
+        let instruction = solana_program::instruction::Instruction {
+            program_id: ctx.accounts.bubblegum_program.key(),
+            accounts,
+            data: cnft_transfer_data,
+        };
+
+        // msg!("manual cpi call to bubblegum program transfer instruction");
+
+        let listing = &ctx.accounts.listing;
+        let seeds = &[
+            listing.item.as_ref(),
+            LISTINGS.as_bytes().as_ref(),
+            listing.keychain.as_bytes().as_ref(),
+            listing.domain.as_bytes().as_ref(),
+            YARDSALE.as_bytes().as_ref(),
+            &[listing.bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        // call bubblegum to transfer the cnft
+        invoke_signed(&instruction, &account_infos, signer).unwrap();
+
+        // no listing_item_token to close since it's a cnft
+
+        Ok(())
 
     }
+
+
 
 }

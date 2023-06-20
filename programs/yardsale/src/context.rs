@@ -1,4 +1,7 @@
 use anchor_lang::prelude::*;
+use std::str::FromStr;
+use solana_program::{pubkey::Pubkey};
+
 use crate::account::*;
 use crate::constant::*;
 use crate::error::*;
@@ -8,6 +11,44 @@ use keychain::account::{CurrentDomain, CurrentKeyChain};
 
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use mpl_bubblegum::state::TreeConfig;
+
+#[derive(Clone)]
+pub struct MplBubblegum;
+
+impl anchor_lang::Id for MplBubblegum {
+    fn id() -> Pubkey {
+        mpl_bubblegum::id()
+    }
+}
+
+// not sure why the use spl_account_compression::Noop/SplAccountCompression IDs don't work
+// maybe cause the solana-program ids and stuff
+/*use spl_account_compression::{
+    program::SplAccountCompression, Noop,
+};
+*/
+
+// const NOOP_PROGRAM_ID: Pubkey = Pubkey::from_str("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV").unwrap();
+
+#[derive(Clone)]
+pub struct Noop;
+
+impl anchor_lang::Id for Noop {
+    fn id() -> Pubkey {
+        Pubkey::from_str("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV").unwrap()
+    }
+}
+
+
+#[derive(Clone)]
+pub struct SplAccountCompression;
+
+impl anchor_lang::Id for SplAccountCompression {
+    fn id() -> Pubkey {
+        spl_account_compression::id()
+    }
+}
 
 
 #[derive(Accounts)]
@@ -138,7 +179,70 @@ pub struct UpdatePrice<'info> {
 }
 
 #[derive(Accounts)]
-pub struct ListPNFT<'info> {
+#[instruction(asset_id: Pubkey)]
+pub struct ListCompressedNft<'info> {
+
+    #[account(
+        constraint = domain.name == keychain.domain
+    )]
+    pub domain: Box<Account<'info, CurrentDomain>>,
+
+    #[account(
+        constraint = keychain.has_key(& leaf_owner.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(
+        init,
+        payer = leaf_owner,
+        seeds = [asset_id.as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+        bump,
+        space = 8 + Listing::MAX_SIZE,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    // the currency the listing is being sold for - native mint should be acceptable
+    #[account()]
+    pub currency: Account<'info, Mint>,
+
+    // the token account to deposit the proceeds into - necessary if currency is spl
+    #[account(
+    token::mint = currency,
+    )]
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: this is only specified if the currency is native (will usually just be the authority, but can be any account to send proceeds to)
+    #[account()]
+    pub proceeds: Option<AccountInfo<'info>>,
+
+    // tree stuff
+    #[account(
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key(),
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Box<Account<'info, TreeConfig>>,
+
+    #[account(
+        mut,
+        owner = compression_program.key()
+    )]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub system_program: Program<'info, System>,
+
+    #[account(mut)]
+    pub leaf_owner: Signer<'info>, // seller
+
+}
+
+#[derive(Accounts)]
+pub struct ListProgrammableNft<'info> {
 
     #[account(
         constraint = domain.name == keychain.domain
@@ -274,7 +378,50 @@ pub struct ListPNFT<'info> {
     #[account(address = mpl_token_auth_rules::id())]
     pub authorization_rules_program: UncheckedAccount<'info>,
 
+    // ruleset is passed in w/remaining accounts
 }
+
+#[derive(Accounts)]
+pub struct DelistCompressedNft<'info> {
+
+    #[account(
+        mut,
+        constraint = listing.domain == keychain.domain && listing.keychain == keychain.name,
+        close = authority,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    #[account(
+        constraint = keychain.has_key(&authority.key()),
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    // tree stuff
+    #[account(
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key(),
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Box<Account<'info, TreeConfig>>,
+
+    #[account(
+        mut,
+        owner = compression_program.key()
+    )]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub system_program: Program<'info, System>,
+}
+
+
 
 #[derive(Accounts)]
 pub struct DelistPNFT<'info> {
@@ -387,12 +534,12 @@ pub struct DelistPNFT<'info> {
     pub instructions: UncheckedAccount<'info>,
 
     /// CHECK:
-    #[account()]
-    pub ruleset: UncheckedAccount<'info>,
+    #[account(owner = mpl_token_auth_rules::id())]
+    pub ruleset: Option<UncheckedAccount<'info>>,
 }
 
 #[derive(Accounts)]
-pub struct PurchasePNFT<'info> {
+pub struct PurchaseProgrammableNft<'info> {
 
     #[account(
         mut,
@@ -534,9 +681,81 @@ pub struct PurchasePNFT<'info> {
     pub instructions: UncheckedAccount<'info>,
 
     /// CHECK:
-    #[account()]
-    pub ruleset: UncheckedAccount<'info>,
+    #[account(owner = mpl_token_auth_rules::id())]
+    pub ruleset: Option<UncheckedAccount<'info>>,
 }
+
+#[derive(Accounts)]
+pub struct PurchaseCompressedNft<'info> {
+
+    #[account(
+        mut,
+        close = treasury,
+    )]
+    pub listing: Box<Account<'info, Listing>>,
+
+    /// CHECK: just sending lamports here when closing the listing
+    #[account(
+        mut,
+        constraint = listing.treasury == treasury.key(),
+    )]
+    pub treasury: AccountInfo<'info>,
+
+    #[account(
+        constraint = listing.currency == currency.key(),
+    )]
+    pub currency: Account<'info, Mint>,
+
+    // needed if the currency is spl
+    #[account(
+        mut,
+        token::mint = currency,
+        constraint = listing.proceeds == proceeds_token.key(),
+    )]
+    pub proceeds_token: Option<Account<'info, TokenAccount>>,
+
+    /// CHECK: this is only specified if the currency is native
+    #[account(
+        mut,
+        constraint = listing.proceeds == proceeds.key(),
+    )]
+    pub proceeds: Option<AccountInfo<'info>>,
+
+    // needed if the currency is spl: this is the buyer's token account
+    #[account(
+        mut,
+        token::mint = currency,
+        token::authority = new_leaf_owner
+    )]
+    pub buyer_currency_token: Option<Account<'info, TokenAccount>>,
+
+    pub token_program: Program<'info, Token>,
+
+    // tree stuff
+    #[account(
+        seeds = [merkle_tree.key().as_ref()],
+        bump,
+        seeds::program = bubblegum_program.key(),
+    )]
+    /// CHECK: This account is neither written to nor read from.
+    pub tree_authority: Box<Account<'info, TreeConfig>>,
+
+    #[account(
+        mut,
+        owner = compression_program.key()
+    )]
+    /// CHECK: This account is modified in the downstream program
+    pub merkle_tree: UncheckedAccount<'info>,
+
+    pub log_wrapper: Program<'info, Noop>,
+    pub compression_program: Program<'info, SplAccountCompression>,
+    pub bubblegum_program: Program<'info, MplBubblegum>,
+    pub system_program: Program<'info, System>,
+
+    #[account(mut)]
+    pub new_leaf_owner: Signer<'info>, //  buyer
+}
+
 
 
 #[derive(Accounts)]
@@ -611,5 +830,4 @@ pub struct PurchaseItem<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program <'info, System>,
 }
-
 
