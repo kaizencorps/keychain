@@ -15,8 +15,8 @@ yardsale = "xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W"
 #keychain = "Key3oJGUxKaddvMRAKbyYVbE8Pf3ycrH8hyZxa7tVCo"
 keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 #profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
-#yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
-yardsale = "xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W"
+yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
+#yardsale = "xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W"
 
 [programs.mainnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
