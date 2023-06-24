@@ -1,7 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import {AnchorProvider, Program, Wallet} from "@project-serum/anchor";
 import { Keychain } from "../target/types/keychain";
-import { Profile } from "../target/types/profile";
 import * as assert from "assert";
 import {Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Transaction} from "@solana/web3.js";
 import {createAssociatedTokenAccount, createMint, mintToChecked} from "@solana/spl-token";
