@@ -8,7 +8,8 @@ pub mod error;
 
 use instructions::{
     create_listing::*,
-    create_listing_domain::*
+    create_listing_domain::*,
+    create_seller::*,
 };
 
 #[program]
@@ -25,6 +26,13 @@ pub mod bazaar {
         args: CreateListingDomainArgs,
     ) -> Result<()> {
         handle_create_listing_domain(ctx, args)
+    }
+
+    pub fn create_seller(
+        ctx: Context<CreateSeller>,
+        args: CreateListingArgs,
+    ) -> Result<()> {
+        handle_create_seller(ctx)
     }
 
     pub fn create_listing(

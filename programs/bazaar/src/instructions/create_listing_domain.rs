@@ -4,7 +4,7 @@ use crate::{
         listing::{Listing, ListingType},
         listing_domain::{ListingDomain},
     },
-    common::constant::{BAZAAR, LISTING_DOMAIN, CURRENT_LISTING_VERSION, CURRENT_LISTING_DOMAIN_VERSION},
+    common::constant::{BAZAAR, LISTING_DOMAIN, CURRENT_LISTING_VERSION, CURRENT_LISTING_DOMAIN_VERSION, DOMAIN_INDEX},
     program::Bazaar
 };
 
@@ -13,6 +13,8 @@ use anchor_lang::{prelude::*, solana_program::program_option::COption};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use spl_token::native_mint::ID as NATIVE_MINT;
 
+
+// admin function
 
 pub fn handle_create_listing_domain(
     ctx: Context<CreateListingDomain>,
@@ -30,6 +32,7 @@ pub fn handle_create_listing_domain(
     listing_domain.name = name;
     listing_domain.bump = *ctx.bumps.get("listing_domain").unwrap();
     listing_domain.account_version = CURRENT_LISTING_DOMAIN_VERSION;
+    listing_domain.domain_index = args.domain_index;
 
     Ok(())
 }
@@ -54,7 +57,7 @@ pub struct CreateListingDomain<'info> {
     #[account(
         init,
         payer = upgrade_authority,
-        seeds = [LISTING_DOMAIN.as_bytes().as_ref(), args.name.as_bytes().as_ref()],
+        seeds = [LISTING_DOMAIN.as_bytes().as_ref(), args.name.as_bytes().as_ref(), DOMAIN_INDEX.as_bytes().as_ref(), args.domain_index.to_le_bytes().as_ref()],
         bump,
         space = 8 + ListingDomain::MAX_SIZE,
     )]
@@ -65,5 +68,6 @@ pub struct CreateListingDomain<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct CreateListingDomainArgs {
-    pub name: String
+    pub name: String,
+    pub domain_index: u8
 }

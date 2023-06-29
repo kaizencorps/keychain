@@ -3,13 +3,18 @@ use crate::{
     common::{
         listing::{Listing, ListingType},
     },
-    common::constant::{BAZAAR, CURRENT_LISTING_VERSION},
+    common::constant::{BAZAAR, CURRENT_LISTING_VERSION, LISTING},
 };
 
 use anchor_lang::{prelude::*, solana_program::program_option::COption};
 
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 use spl_token::native_mint::ID as NATIVE_MINT;
+use crate::common::listing_domain::ListingDomain;
+use crate::common::seller::SellerAccount;
+
+use keychain::program::Keychain;
+use keychain::account::{CurrentDomain, CurrentKeyChain};
 
 
 pub fn handle_create_listing(
@@ -40,6 +45,11 @@ pub fn handle_create_listing(
 
     // todo: check price
 
+    // increment the seller's listing index
+    let seller_account = &mut ctx.accounts.seller_account;
+    seller_account.listing_index = seller_account.listing_index.checked_add(1).unwrap();
+
+    // create the listing
     let listing = &mut ctx.accounts.listing;
     listing.account_version = CURRENT_LISTING_VERSION;
     listing.price = args.price;
@@ -70,13 +80,29 @@ pub fn handle_create_listing(
 )]
 pub struct CreateListing<'info> {
 
+    // todo: specify keychain for listing
+
+    #[account(mut)]
+    pub listing_domain: Box<Account<'info, ListingDomain>>,
+
     #[account(mut)]
     pub seller: Signer<'info>,
 
     #[account(
+        mut,
+        constraint = seller_account.keychain == keychain.key(),
+    )]
+    pub seller_account: Box<Account<'info, SellerAccount>>,
+
+    #[account(
+        constraint = keychain.has_key(&seller.key())
+    )]
+    pub keychain: Box<Account<'info, CurrentKeyChain>>,
+
+    #[account(
         init,
         payer = seller,
-        seeds = [BAZAAR.as_bytes().as_ref()],
+        seeds = [LISTING.as_bytes().as_ref(), seller_account.key().as_ref(), &seller_account.listing_index.checked_add(1).unwrap().to_le_bytes()],
         bump,
         space = 8 + Listing::MAX_SIZE,
     )]
