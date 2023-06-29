@@ -22,17 +22,24 @@ pub fn handle_create_listing_domain(
 ) -> Result<()> {
 
     // we only reserve 32 bytes for the domain name
+    msg!("creating new listing domain: {}, index: {}", args.name, args.domain_index);
+
     let domain_name_bytes = args.name.as_bytes();
     require!(domain_name_bytes.len() <= 32, BazaarError::NameTooLong);
 
+
+    // copy the name in; fixed width
     let mut name = [0u8; 32];
     name[..domain_name_bytes.len()].copy_from_slice(domain_name_bytes);
+
+    msg!("domain name bytes: {:?}", name);
 
     let mut listing_domain = &mut ctx.accounts.listing_domain;
     listing_domain.name = name;
     listing_domain.bump = *ctx.bumps.get("listing_domain").unwrap();
     listing_domain.account_version = CURRENT_LISTING_DOMAIN_VERSION;
     listing_domain.domain_index = args.domain_index;
+    listing_domain.treasury = args.treasury;
 
     Ok(())
 }
@@ -69,5 +76,6 @@ pub struct CreateListingDomain<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct CreateListingDomainArgs {
     pub name: String,
-    pub domain_index: u8
+    pub domain_index: u8,
+    pub treasury: Pubkey,
 }

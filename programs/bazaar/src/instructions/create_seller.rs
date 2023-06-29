@@ -24,7 +24,9 @@ pub fn handle_create_seller(
 ) -> Result<()> {
 
     let seller = &mut ctx.accounts.seller_account;
-    seller.listing_index = 0;
+
+    // start listing index @ 1
+    seller.listing_index = 1;
     seller.account_version = CURRENT_SELLER_VERSION;
     seller.bump = *ctx.bumps.get("seller_account").unwrap();
     seller.keychain = ctx.accounts.keychain.key();

@@ -30,7 +30,6 @@ pub mod bazaar {
 
     pub fn create_seller(
         ctx: Context<CreateSeller>,
-        args: CreateListingArgs,
     ) -> Result<()> {
         handle_create_seller(ctx)
     }

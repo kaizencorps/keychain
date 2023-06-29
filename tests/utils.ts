@@ -8,16 +8,18 @@ import {
   TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 import {AnchorProvider, Program, Provider, web3} from "@project-serum/anchor";
-import { Keychain } from "../target/types/keychain";
-import { Profile } from "../target/types/profile";
-import { Yardsale } from "../target/types/yardsale";
 import {Metaplex, WalletAdapter, walletAdapterIdentity} from "@metaplex-foundation/js";
 import {TokenStandard} from "@metaplex-foundation/mpl-token-metadata";
 
 export const DOMAIN = 'domination';
 export const KEYCHAIN = 'keychain';
 export const YARDSALE = 'yardsale';
+
+
+// bazaar constants
+export const SELLER = 'seller';
 export const LISTING_DOMAIN = 'listing_domain';
+export const DOMAIN_INDEX = "domain_index";
 
 export const DOMAIN_STATE = 'domain_state';
 
@@ -260,11 +262,23 @@ export function sleep(ms) {
 
 
 /// bazaar utils
-export const findListingDomainPda = (domainName: string, bazaarprogid: PublicKey): [PublicKey, number] => {
+export const findListingDomainPda = (domainName: string, domainIndex: number, bazaarprogid: PublicKey): [PublicKey, number] => {
   return anchor.web3.PublicKey.findProgramAddressSync(
       [
         Buffer.from(anchor.utils.bytes.utf8.encode(LISTING_DOMAIN)),
         Buffer.from(anchor.utils.bytes.utf8.encode(domainName)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(DOMAIN_INDEX)),
+        Buffer.from([domainIndex]),
+      ],
+      bazaarprogid,
+  );
+}
+
+export const findSellerAccountPda = (keychainPda: PublicKey, bazaarprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode(SELLER)),
+        keychainPda.toBuffer(),
       ],
       bazaarprogid,
   );

@@ -70,6 +70,13 @@ pub fn handle_create_listing(
         listing.proceeds = proceeds_token.as_ref().unwrap().key();
     }
 
+    // the items are specified in the remaining accounts
+    /*
+    for acc in ctx.remaining_accounts.iter() {
+        accounts.push(AccountMeta::new_readonly(acc.key(), false));
+        account_infos.push(acc.to_account_info());
+    }
+     */
 
     Ok(())
 }
