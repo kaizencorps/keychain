@@ -1,5 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import {
+  createTokenMint,
   findDomainPda,
   findDomainStatePda,
   findKeychainKeyPda,
@@ -13,6 +14,11 @@ const { assert } = require("chai");
 const { PublicKey } = anchor.web3;
 import { Keychain } from "../target/types/keychain";
 import {expect} from "chai";
+import {
+  createAssociatedTokenAccount, createAssociatedTokenAccountInstruction,
+  createMintToCheckedInstruction,
+  getAssociatedTokenAddressSync
+} from "@solana/spl-token";
 
 function randomName() {
   return Math.random().toString(36).substring(2, 5) + Math.random().toString(36).substring(2, 5);
@@ -34,6 +40,7 @@ let treasury = anchor.web3.Keypair.generate();
 const sellerName = randomName();
 let sellerKeychainPda = null;
 let sellerKeypair = anchor.web3.Keypair.generate();
+let buyerKeypair = anchor.web3.Keypair.generate();
 let sellerAccountPda = null;
 
 
@@ -60,6 +67,12 @@ describe("bazaar", () => {
     // airdrop some sol to the seller
     await provider.connection.confirmTransaction(
         await provider.connection.requestAirdrop(sellerKeypair.publicKey, anchor.web3.LAMPORTS_PER_SOL * 10),
+        "confirmed"
+    );
+
+    // airdrop some sol to the buyer
+    await provider.connection.confirmTransaction(
+        await provider.connection.requestAirdrop(buyerKeypair.publicKey, anchor.web3.LAMPORTS_PER_SOL * 10),
         "confirmed"
     );
 
@@ -132,13 +145,6 @@ describe("bazaar", () => {
     }).instruction();
 
     let tx = new Transaction().add(ix);
-    console.log("creating keychain for ", sellerName);
-
-    // let sim = await provider.connection.simulateTransaction(tx, [sellerKeypair]);
-    // console.log('simulated tx: ', sim);
-
-    txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
-    console.log(`created keychain: ${sellerName}, txid `, txid);
 
     [sellerAccountPda] = findSellerAccountPda(sellerKeychainPda, bazaarProg.programId);
 
@@ -149,19 +155,43 @@ describe("bazaar", () => {
       systemProgram: SystemProgram.programId,
     }).instruction();
 
-    tx = new Transaction().add(ix);
+    tx.add(ix);
 
     txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
-    console.log(`created seller account: ${sellerName}, txid `, txid);
+    console.log(`created keychain and seller account for: ${sellerName}, txid `, txid);
 
     let sellerAccount = await bazaarProg.account.sellerAccount.fetch(sellerAccountPda);
 
     console.log("seller account: ", sellerAccount);
-
     expect(sellerAccount.accountVersion).to.equal(0);
     expect(sellerAccount.bump).to.be.greaterThan(0);
     expect(sellerAccount.listingIndex).to.equal(1);
     expect(sellerAccount.keychain.toBase58()).to.equal(sellerKeychainPda.toBase58());
+
+  });
+
+  it("creates a listing", async () => {
+    let currencyMint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey);
+
+    // currency atas for the buyer / seller
+    let buyerCurrencyTokenAcct = await createAssociatedTokenAccount(connection, buyerKeypair, currencyMint.publicKey, buyerKeypair.publicKey);
+    let sellerCurrencyTokenAcct = await createAssociatedTokenAccount(connection, sellerKeypair, currencyMint.publicKey, sellerKeypair.publicKey);
+
+    // now mint 10k tokens to buyer's currency ata and create the seller's currency ata
+    const numTokens = 10000;
+    const tx = new Transaction().add(
+        createMintToCheckedInstruction(
+            currencyMint.publicKey,
+            sellerCurrencyTokenAcct,
+            sellerKeypair.publicKey,
+            numTokens * 1e9,
+            9
+        ),
+    );
+    let txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
+    console.log(`minted ${numTokens} tokens to seller's ata: ${sellerCurrencyTokenAcct.toBase58()} \n`);
+
+
 
   });
 

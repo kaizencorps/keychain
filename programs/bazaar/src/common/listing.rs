@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use crate::common::constant::MAX_LISTING_ITEMS;
 
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
@@ -19,19 +20,10 @@ pub struct Listing {
     pub price: u64,
     pub proceeds: Pubkey,     // token account if currency = spl or just account if currency = sol
     pub listing_type: ListingType,
+    pub items: Vec<ListingItem>,
 
-
-    // pub domain: String,
-    // pub keychain: String,
-    // todo: add collection for lookups too
-    // pub collection: Pubkey,
-
-    // pulled from the domain
-    // pub treasury: Pubkey,
-
-    // pub item: Pubkey,
-    // pub item_token: Pubkey,     // not used if listing is a c_nft - just set to item
-
+    // pulled from the listing domain
+    pub treasury: Pubkey,
 
 }
 
@@ -43,10 +35,22 @@ impl Listing {
             8 + // price
             32 + // proceeds account (token account or regular if sol = currency)
             1 + // listing type
-            // 32 + // domain
-            // 32 + // keychain
-            // 32 + // treasury
+            32 + // treasury
             // 32 + // mint
-            32 + // ata
+            (4 + (MAX_LISTING_ITEMS * ListingItem::SIZE)) +   // items
             192; // extra space
+}
+
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct ListingItem {
+    pub quantity: u64,          // u64 cause it might be a token
+    pub item_mint: Pubkey,      // item's mint
+    pub item_token: Pubkey,     // listing's token account
+}
+
+impl ListingItem {
+    pub const SIZE: usize =
+        8 +         // quantity
+        32 +        // item (mint)
+        32;         // item token account
 }
