@@ -17,6 +17,7 @@ import {TokenStandard} from "@metaplex-foundation/mpl-token-metadata";
 export const DOMAIN = 'domination';
 export const KEYCHAIN = 'keychain';
 export const YARDSALE = 'yardsale';
+export const LISTING_DOMAIN = 'listing_domain';
 
 export const DOMAIN_STATE = 'domain_state';
 
@@ -255,4 +256,16 @@ export const findListingPda = (nftMint: PublicKey, keychainName: string, domain:
 
 export function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+/// bazaar utils
+export const findListingDomainPda = (domainName: string, bazaarprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode(LISTING_DOMAIN)),
+        Buffer.from(anchor.utils.bytes.utf8.encode(domainName)),
+      ],
+      bazaarprogid,
+  );
 }
