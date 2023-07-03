@@ -1,23 +1,24 @@
 import * as anchor from "@project-serum/anchor";
 import {
-  createTokenMint,
+  createTokenMint, findBazaarListingPda,
   findDomainPda,
   findDomainStatePda,
   findKeychainKeyPda,
   findKeychainPda,
   findKeychainStatePda,
-  findListingDomainPda, findSellerAccountPda
+  findListingDomainPda, findSellerAccountPda, sleep
 } from "./utils";
-import {SystemProgram, Transaction} from "@solana/web3.js";
+import {LAMPORTS_PER_SOL, SystemProgram, Transaction} from "@solana/web3.js";
 import {Program} from "@project-serum/anchor";
 const { assert } = require("chai");
 const { PublicKey } = anchor.web3;
 import { Keychain } from "../target/types/keychain";
 import {expect} from "chai";
 import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccount, createAssociatedTokenAccountInstruction,
   createMintToCheckedInstruction,
-  getAssociatedTokenAddressSync
+  getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 
 function randomName() {
@@ -32,6 +33,7 @@ let keychainDomainPda = null;
 const keyCost = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
 
 let txid: string;
+let tx: Transaction;
 let programDataAccount;
 
 // we'll use this as the keychain domain + listing domain treasury
@@ -42,6 +44,7 @@ let sellerKeychainPda = null;
 let sellerKeypair = anchor.web3.Keypair.generate();
 let buyerKeypair = anchor.web3.Keypair.generate();
 let sellerAccountPda = null;
+let sellerAccountListingIndex = 0;
 
 
 describe("bazaar", () => {
@@ -165,32 +168,107 @@ describe("bazaar", () => {
     console.log("seller account: ", sellerAccount);
     expect(sellerAccount.accountVersion).to.equal(0);
     expect(sellerAccount.bump).to.be.greaterThan(0);
-    expect(sellerAccount.listingIndex).to.equal(1);
+    expect(sellerAccount.listingIndex).to.equal(0);
     expect(sellerAccount.keychain.toBase58()).to.equal(sellerKeychainPda.toBase58());
-
+    sellerAccountListingIndex = 0;
   });
 
-  it("creates a listing", async () => {
-    let currencyMint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey);
+  it("creates a single item listing", async () => {
+    let itemMint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey);
 
     // currency atas for the buyer / seller
-    let buyerCurrencyTokenAcct = await createAssociatedTokenAccount(connection, buyerKeypair, currencyMint.publicKey, buyerKeypair.publicKey);
-    let sellerCurrencyTokenAcct = await createAssociatedTokenAccount(connection, sellerKeypair, currencyMint.publicKey, sellerKeypair.publicKey);
+    let buyerItemTokenAccount = await createAssociatedTokenAccount(connection, buyerKeypair, itemMint.publicKey, buyerKeypair.publicKey);
+    let sellerItemTokenAccount = await createAssociatedTokenAccount(connection, sellerKeypair, itemMint.publicKey, sellerKeypair.publicKey);
 
     // now mint 10k tokens to buyer's currency ata and create the seller's currency ata
     const numTokens = 10000;
-    const tx = new Transaction().add(
+    tx = new Transaction().add(
         createMintToCheckedInstruction(
-            currencyMint.publicKey,
-            sellerCurrencyTokenAcct,
+            itemMint.publicKey,
+            sellerItemTokenAccount,
             sellerKeypair.publicKey,
             numTokens * 1e9,
             9
         ),
     );
     let txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
-    console.log(`minted ${numTokens} tokens to seller's ata: ${sellerCurrencyTokenAcct.toBase58()} \n`);
+    console.log(`minted ${numTokens} tokens to seller's ata: ${sellerItemTokenAccount.toBase58()} \n`);
 
+    let currencyMint = NATIVE_MINT;
+    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 5);
+    let quantity = new anchor.BN(9 * 100); // 9 tokens
+
+    let [listingPda] = findBazaarListingPda(sellerAccountPda, ++sellerAccountListingIndex, bazaarProg.programId);
+    let listingItemToken = getAssociatedTokenAddressSync(itemMint.publicKey, listingPda, true);
+
+    await sleep(1000);
+
+    let accounts = {
+      listingDomain: listingDomainPda,
+      seller: sellerKeypair.publicKey,
+      sellerAccount: sellerAccountPda,
+      keychain: sellerKeychainPda,
+      listing: listingPda,
+      currency: currencyMint,
+      // proceedsToken: null,
+      proceeds: sellerKeypair.publicKey,
+      item0: itemMint.publicKey,
+      item0SellerToken: sellerItemTokenAccount,
+      item0ListingToken: listingItemToken,
+      item1: null,
+      item1SellerToken: null,
+      item1ListingToken: null,
+      item2: null,
+      item2SellerToken: null,
+      item2ListingToken: null,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    };
+    console.log('accounts: ', accounts);
+
+    // create the listing
+    tx = await bazaarProg.methods.createListing({price, listingType: {bag: {}}, itemQuantities: [quantity]}).accounts({
+      listingDomain: listingDomainPda,
+      seller: sellerKeypair.publicKey,
+      sellerAccount: sellerAccountPda,
+      keychain: sellerKeychainPda,
+      listing: listingPda,
+      currency: currencyMint,
+      proceedsToken: null,
+      proceeds: sellerKeypair.publicKey,
+      item0: itemMint.publicKey,
+      item0SellerToken: sellerItemTokenAccount,
+      item0ListingToken: listingItemToken,
+      item1: null,
+      item1SellerToken: null,
+      item1ListingToken: null,
+      item2: null,
+      item2SellerToken: null,
+      item2ListingToken: null,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    }).transaction();
+
+    console.log("create listing tx: ", tx);
+    console.log("keys: ", tx.instructions[0].keys);
+
+    txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
+
+    console.log(`created listing: ${listingPda.toBase58()}, txid `, txid);
+    const listing = await bazaarProg.account.listing.fetch(listingPda);
+    console.log("listing account: ", listing);
+
+    expect(listing.accountVersion).to.equal(0);
+    expect(listing.bump).is.greaterThan(0);
+    expect(listing.currency.toBase58()).to.equal(currencyMint.toBase58());
+    assert.isTrue('bag' in listing.listingType);
+    assert(listing.items.length == 1);
+    expect(listing.items[0].quantity.toNumber()).to.equal(quantity.toNumber());
+    expect(listing.items[0].itemMint.toBase58()).to.equal(itemMint.publicKey.toBase58());
+    expect(listing.items[0].itemToken.toBase58()).to.equal(listingItemToken.toBase58());
+    expect(listing.treasury.toBase58()).to.equal(treasury.publicKey.toBase58());
 
 
   });

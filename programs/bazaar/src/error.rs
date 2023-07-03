@@ -3,6 +3,23 @@ use anchor_lang::error_code;
 #[error_code]
 pub enum BazaarError {
 
+    #[msg("No items specified")]
+    NoItemsSpecified,
+    #[msg("Invalid item accounts")]
+    InvalidItemAccounts,
+    #[msg("Missing item quantities")]
+    MissingItemQuantities,
+    #[msg("Too many item quantities")]
+    TooManyItemQuantities,
+    #[msg("Missing item account")]
+    MissingItemAccount,
+    #[msg("Item quantities must be whole numbers")]
+    InvalidItemQuantity,
+    #[msg("Attempted to list more items than owned")]
+    NotEnoughItems,
+    #[msg("Too many items")]
+    TooManyItems,
+
     // ported over from yardsale
 
     #[msg("Not authorized")]

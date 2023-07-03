@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::common::constant::MAX_LISTING_ITEMS;
+use crate::error::BazaarError;
 
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
@@ -39,6 +40,14 @@ impl Listing {
             // 32 + // mint
             (4 + (MAX_LISTING_ITEMS * ListingItem::SIZE)) +   // items
             192; // extra space
+
+    pub fn add_listing_item(&mut self, item: ListingItem) -> Result<()> {
+        if self.items.len() >= MAX_LISTING_ITEMS {
+            return Err(BazaarError::TooManyItems.into());
+        }
+        self.items.push(item);
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]

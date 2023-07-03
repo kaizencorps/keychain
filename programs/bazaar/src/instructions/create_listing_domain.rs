@@ -34,7 +34,7 @@ pub fn handle_create_listing_domain(
 
     msg!("domain name bytes: {:?}", name);
 
-    let mut listing_domain = &mut ctx.accounts.listing_domain;
+    let listing_domain = &mut ctx.accounts.listing_domain;
     listing_domain.name = name;
     listing_domain.bump = *ctx.bumps.get("listing_domain").unwrap();
     listing_domain.account_version = CURRENT_LISTING_DOMAIN_VERSION;

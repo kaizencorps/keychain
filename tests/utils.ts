@@ -19,6 +19,7 @@ export const YARDSALE = 'yardsale';
 // bazaar constants
 export const SELLER = 'seller';
 export const LISTING_DOMAIN = 'listing_domain';
+export const LISTING = 'listing';
 export const DOMAIN_INDEX = "domain_index";
 
 export const DOMAIN_STATE = 'domain_state';
@@ -279,6 +280,19 @@ export const findSellerAccountPda = (keychainPda: PublicKey, bazaarprogid: Publi
       [
         Buffer.from(anchor.utils.bytes.utf8.encode(SELLER)),
         keychainPda.toBuffer(),
+      ],
+      bazaarprogid,
+  );
+}
+
+
+export const findBazaarListingPda = (sellerAccount: PublicKey, sellerAccountListingIndex: number, bazaarprogid: PublicKey): [PublicKey, number] => {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(anchor.utils.bytes.utf8.encode(LISTING)),
+        sellerAccount.toBuffer(),
+        new anchor.BN(sellerAccountListingIndex).toArrayLike(Buffer, "le", 4),
+        // Buffer.from([sellerAccountListingIndex]),
       ],
       bazaarprogid,
   );
