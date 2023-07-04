@@ -27,6 +27,7 @@ pub fn handle_create_seller(
     seller.account_version = CURRENT_SELLER_VERSION;
     seller.bump = *ctx.bumps.get("seller_account").unwrap();
     seller.keychain = ctx.accounts.keychain.key();
+    seller.num_sales = 0;
 
     Ok(())
 }

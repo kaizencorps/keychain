@@ -1,7 +1,7 @@
 use crate::{
     error::BazaarError,
     common::{
-        listing::{Listing, ListingType},
+        listing::{Listing, ListingType, ListingItem},
     },
     common::constant::{BAZAAR, CURRENT_LISTING_VERSION, LISTING},
 };
@@ -16,7 +16,6 @@ use crate::common::seller::SellerAccount;
 
 use keychain::program::Keychain;
 use keychain::account::{CurrentDomain, CurrentKeyChain};
-use crate::common::listing::ListingItem;
 
 
 pub fn handle_create_listing<'info>(
@@ -45,7 +44,7 @@ pub fn handle_create_listing<'info>(
     verbose_msg!("Verified Non-Fungibility");
      */
 
-    // todo: check price
+    // todo: check price ..?
 
     // increment the seller's listing index
     let seller_account = &mut ctx.accounts.seller_account;
@@ -55,6 +54,12 @@ pub fn handle_create_listing<'info>(
 
     // check that the item quantity args are valid
     check_item_quantities(&ctx.accounts, &args.item_quantities)?;
+
+    // if the listing type == unit, then disallow token listing (they can only be part of a bag)
+    // units are for SFTs only
+    if args.listing_type == ListingType::UNIT {
+        require!(ctx.accounts.item_0.decimals == 0, BazaarError::TokenUnitListingsNotAllowed);
+    }
 
     // go through the items and transfer them into listing owned accounts + set up the ListingItem structs
    transfer_items_to_listing(&ctx.accounts, &args.item_quantities)?;
@@ -72,6 +77,7 @@ pub fn handle_create_listing<'info>(
     listing.bump = *ctx.bumps.get("listing").unwrap();
     listing.treasury = listing_domain.treasury.key();
     listing.listing_type = args.listing_type;
+    listing.seller_account = ctx.accounts.seller_account.key();
 
     if ctx.accounts.currency.key() == NATIVE_MINT {
         require!(ctx.accounts.proceeds.is_some(), BazaarError::ProceedsAccountNotSpecified);
@@ -86,51 +92,6 @@ pub fn handle_create_listing<'info>(
     for listing_item in listing_items {
         listing.add_listing_item(listing_item)?;
     }
-
-
-   /*
-    let item_mint = &mut ctx.accounts.item_0;
-    let seller_item_token = &mut ctx.accounts.item_0_seller_token;
-    let listing_item_token = &mut ctx.accounts.item_0_listing_token;
-    let quantity = args.item_quantities[0];
-
-    let seller_account_info = ctx.accounts.seller.to_account_info();
-
-    // transfer the items from the seller to the listing account
-    let token_program = &ctx.accounts.token_program.to_account_info();
-
-    let mut cpi_accounts = Transfer {
-        from: ctx.accounts.item_0_seller_token.to_account_info(),
-        to: ctx.accounts.item_0_listing_token.to_account_info(),
-        authority: seller_account_info.clone()
-    };
-
-    let mut cpi_ctx = CpiContext::new(token_program.clone(), cpi_accounts);
-    token::transfer(cpi_ctx, quantity)?;
-
-    if num_quantities > 1 {
-        // then transfer 2nd item
-        cpi_accounts = Transfer {
-            from: ctx.accounts.item_1_seller_token.as_ref().unwrap().to_account_info(),
-            to: ctx.accounts.item_1_listing_token.as_ref().unwrap().to_account_info(),
-            authority: seller_account_info.clone()
-        };
-        cpi_ctx = CpiContext::new(token_program.clone(), cpi_accounts);
-        token::transfer(cpi_ctx, quantity)?;
-
-        if num_quantities > 2 {
-            // then transfer 3rd item
-            cpi_accounts = Transfer {
-                from: ctx.accounts.item_2_seller_token.as_ref().unwrap().to_account_info(),
-                to: ctx.accounts.item_2_listing_token.as_ref().unwrap().to_account_info(),
-                authority: seller_account_info
-            };
-            cpi_ctx = CpiContext::new(token_program.clone(), cpi_accounts);
-            token::transfer(cpi_ctx, quantity)?;
-        }
-    }
-
-    */
 
     Ok(())
 }
@@ -261,7 +222,6 @@ pub struct CreateListing<'info> {
     #[account()]
     pub proceeds: Option<AccountInfo<'info>>,
 
-    // instead of using remaining accounts, we'll add the accounts here
     pub item_0: Box<Account<'info, Mint>>,
 
     #[account(

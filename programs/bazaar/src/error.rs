@@ -19,6 +19,15 @@ pub enum BazaarError {
     NotEnoughItems,
     #[msg("Too many items")]
     TooManyItems,
+    #[msg("Token unit listings not allowed")]
+    TokenUnitListingsNotAllowed,
+
+    #[msg("Missing a buyer's item token account")]
+    MissingBuyerItemToken,
+    #[msg("Missing a listing's item token account")]
+    MissingListingItemToken,
+
+
 
     // ported over from yardsale
 
@@ -40,12 +49,8 @@ pub enum BazaarError {
     FundingAccountNotSpecified,
     #[msg("Insufficient funds")]
     InsufficientFunds,
+    #[msg("Insufficient units")]
+    InsufficientUnits,
 
-    // pNFT shit
-    #[msg("Bad Metadata")]
-    BadMetadata,
-    #[msg("Bad Ruleset")]
-    BadRuleset,
-    #[msg("TransferBuilder failed")]
-    TransferBuilderFailed
+
 }

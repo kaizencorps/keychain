@@ -10,6 +10,7 @@ use instructions::{
     create_listing::*,
     create_listing_domain::*,
     create_seller::*,
+    buy::*,
 };
 
 #[program]
@@ -39,6 +40,13 @@ pub mod bazaar {
         args: CreateListingArgs,
     ) -> Result<()> {
         handle_create_listing(ctx, args)
+    }
+
+    pub fn buy(
+        ctx: Context<Buy>,
+        num_items: u64
+    ) -> Result<()> {
+        handle_buy(ctx, num_items)
     }
 }
 

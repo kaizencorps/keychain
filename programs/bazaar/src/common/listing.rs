@@ -16,11 +16,15 @@ pub struct Listing {
     pub account_version: u8,
     pub bump: u8,
 
+    // seller account
+    pub seller_account: Pubkey,
+
     // listing info
+    pub listing_index: u32,
+    pub listing_type: ListingType,
     pub currency: Pubkey,     // native mint (wSOL) or an spl token mint
     pub price: u64,
     pub proceeds: Pubkey,     // token account if currency = spl or just account if currency = sol
-    pub listing_type: ListingType,
     pub items: Vec<ListingItem>,
 
     // pulled from the listing domain
@@ -32,6 +36,8 @@ impl Listing {
     pub const MAX_SIZE: usize =
         1 + // account version
         1 + // bump
+            32 + // seller account
+            4 + // listing index
             32 + // currency
             8 + // price
             32 + // proceeds account (token account or regular if sol = currency)
@@ -48,6 +54,25 @@ impl Listing {
         self.items.push(item);
         Ok(())
     }
+
+    pub fn has_item(&self, item_mint: &Pubkey) -> bool {
+        for item in &self.items {
+            if item.item_mint == *item_mint {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn has_item_token(&self, item_token: &Pubkey) -> bool {
+        for item in &self.items {
+            if item.item_token == *item_token {
+                return true;
+            }
+        }
+        false
+    }
+
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]

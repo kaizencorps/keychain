@@ -12,6 +12,7 @@ pub struct SellerAccount {
     // pub keychain_name: String,
     // pub keychain_domain: String,
     pub listing_index: u32,
+    pub num_sales: u32,
 
 }
 
@@ -21,5 +22,6 @@ impl SellerAccount {
         1 + // bump
         32 + // keychain
         4 + // listing index
+        4 + // num sales
         192; // extra space
 }

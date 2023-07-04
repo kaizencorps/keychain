@@ -228,12 +228,13 @@ describe("bazaar", () => {
     let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 5);
 
     // so, selling 9 tokens for 5 sol each
-    let quantity = new anchor.BN(9 * 1e9); // 9 tokens
+    let quantity = new anchor.BN(9); // 9 items
 
     let [listingPda] = findBazaarListingPda(sellerAccountPda, ++sellerAccountListingIndex, bazaarProg.programId);
-    let listingItemToken = getAssociatedTokenAddressSync(item0Mint.publicKey, listingPda, true);
+    let listingItem0Token = getAssociatedTokenAddressSync(item0Mint.publicKey, listingPda, true);
+    let listingItem1Token = getAssociatedTokenAddressSync(item1Mint.publicKey, listingPda, true);
 
-    // create the listing
+    // try to create the listing (will fail cause we're unit listing a token)
     tx = await bazaarProg.methods.createListing({price, listingType: {unit: {}}, itemQuantities: [quantity]}).accounts({
       listingDomain: listingDomainPda,
       seller: sellerKeypair.publicKey,
@@ -245,7 +246,38 @@ describe("bazaar", () => {
       proceeds: sellerKeypair.publicKey,
       item0: item0Mint.publicKey,
       item0SellerToken: sellerItem0TokenAccount,
-      item0ListingToken: listingItemToken,
+      item0ListingToken: listingItem0Token,
+      item1: null,
+      item1SellerToken: null,
+      item1ListingToken: null,
+      item2: null,
+      item2SellerToken: null,
+      item2ListingToken: null,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    }).transaction();
+
+    // can't unit list a token
+    try {
+      txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
+    } catch (e) {
+      console.log('caught expected error', e);
+    }
+
+    // create the listing - this time unit listting for sft
+    tx = await bazaarProg.methods.createListing({price, listingType: {unit: {}}, itemQuantities: [quantity]}).accounts({
+      listingDomain: listingDomainPda,
+      seller: sellerKeypair.publicKey,
+      sellerAccount: sellerAccountPda,
+      keychain: sellerKeychainPda,
+      listing: listingPda,
+      currency: currencyMint,
+      proceedsToken: null,
+      proceeds: sellerKeypair.publicKey,
+      item0: item1Mint.publicKey,
+      item0SellerToken: sellerItem1TokenAccount,
+      item0ListingToken: listingItem1Token,
       item1: null,
       item1SellerToken: null,
       item1ListingToken: null,
@@ -269,8 +301,8 @@ describe("bazaar", () => {
     assert.isTrue('unit' in listing.listingType);
     assert(listing.items.length == 1);
     expect(listing.items[0].quantity.toNumber()).to.equal(quantity.toNumber());
-    expect(listing.items[0].itemMint.toBase58()).to.equal(item0Mint.publicKey.toBase58());
-    expect(listing.items[0].itemToken.toBase58()).to.equal(listingItemToken.toBase58());
+    expect(listing.items[0].itemMint.toBase58()).to.equal(item1Mint.publicKey.toBase58());
+    expect(listing.items[0].itemToken.toBase58()).to.equal(listingItem1Token.toBase58());
     expect(listing.treasury.toBase58()).to.equal(treasury.publicKey.toBase58());
   });
 
@@ -311,9 +343,6 @@ describe("bazaar", () => {
     // create the listing
     tx = await bazaarProg.methods.createListing({price, listingType: {bag: {}}, itemQuantities: [item0Quantity, item1Quantity]})
         .accounts(accounts).transaction();
-
-    console.log("create listing tx: ", tx);
-    console.log("keys: ", tx.instructions[0].keys);
 
     txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
 
