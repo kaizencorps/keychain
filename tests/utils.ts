@@ -36,7 +36,7 @@ export const PROFILE = 'profile';
 // const profileProgram = anchor.workspace.Profile as Program<Profile>;
 // const yardsaleProgram = anchor.workspace.Profile as Program<Yardsale>;
 
-export async function createTokenMint(connection: Connection, payer: Keypair, authority: PublicKey): Promise<Keypair> {
+export async function createTokenMint(connection: Connection, payer: Keypair, authority: PublicKey, decimals=9): Promise<Keypair> {
 
   const lamports = await getMinimumBalanceForRentExemptMint(connection);
   const mintKey = anchor.web3.Keypair.generate();
@@ -49,7 +49,7 @@ export async function createTokenMint(connection: Connection, payer: Keypair, au
         lamports,
         programId: TOKEN_PROGRAM_ID,
       }),
-      createInitializeMint2Instruction(mintKey.publicKey, 9, authority, authority, TOKEN_PROGRAM_ID),
+      createInitializeMint2Instruction(mintKey.publicKey, decimals, authority, authority, TOKEN_PROGRAM_ID),
   );
 
   await sendAndConfirmTransaction(connection, transaction, [payer, mintKey]);

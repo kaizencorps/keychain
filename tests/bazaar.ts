@@ -8,7 +8,7 @@ import {
   findKeychainStatePda,
   findListingDomainPda, findSellerAccountPda, sleep
 } from "./utils";
-import {LAMPORTS_PER_SOL, SystemProgram, Transaction} from "@solana/web3.js";
+import {Keypair, LAMPORTS_PER_SOL, SystemProgram, Transaction} from "@solana/web3.js";
 import {Program} from "@project-serum/anchor";
 const { assert } = require("chai");
 const { PublicKey } = anchor.web3;
@@ -59,6 +59,17 @@ describe("bazaar", () => {
 
   const [listingDomainPda] = findListingDomainPda(listingDomainName, 0, bazaarProg.programId);
 
+  let item0Mint: Keypair;
+  let item1Mint: Keypair;
+  let item2Mint: Keypair;
+
+  // @ts-ignore
+  let sellerItem0TokenAccount: PublicKey;
+  // @ts-ignore
+  let sellerItem1TokenAccount: PublicKey;
+  // @ts-ignore
+  let sellerItem2TokenAccount: PublicKey;
+
   it ('sets up the test', async () => {
 
     // airdrop 1 sol to the treasury
@@ -91,6 +102,44 @@ describe("bazaar", () => {
     }).rpc();
     console.log(`created keychain domain tx: ${txid}`);
 
+    // mint some item tokens to seller's account
+    item0Mint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey);
+    item1Mint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey, 0);
+    item2Mint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey, 0);
+
+    sellerItem0TokenAccount = await createAssociatedTokenAccount(connection, sellerKeypair, item0Mint.publicKey, sellerKeypair.publicKey);
+    sellerItem1TokenAccount = await createAssociatedTokenAccount(connection, sellerKeypair, item1Mint.publicKey, sellerKeypair.publicKey);
+    sellerItem2TokenAccount = await createAssociatedTokenAccount(connection, sellerKeypair, item2Mint.publicKey, sellerKeypair.publicKey);
+
+    // now mint 10k tokens to seller's item0Mint ata and create the seller's currency ata
+    const numTokens = 10000;
+    tx = new Transaction().add(
+        // item0 = token
+        createMintToCheckedInstruction(
+            item0Mint.publicKey,
+            sellerItem0TokenAccount,
+            sellerKeypair.publicKey,
+            numTokens * 1e9,
+            9
+        ),
+        // item1/2 = SFT
+        createMintToCheckedInstruction(
+            item1Mint.publicKey,
+            sellerItem1TokenAccount,
+            sellerKeypair.publicKey,
+            numTokens,
+            0
+        ),
+        createMintToCheckedInstruction(
+            item2Mint.publicKey,
+            sellerItem2TokenAccount,
+            sellerKeypair.publicKey,
+            numTokens,
+            0
+        ),
+    );
+    txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
+    console.log(`minted ${numTokens} tokens to seller's item token accounts`);
   });
 
 
@@ -173,62 +222,19 @@ describe("bazaar", () => {
     sellerAccountListingIndex = 0;
   });
 
-  it("creates a single item listing", async () => {
-    let itemMint = await createTokenMint(connection, sellerKeypair, sellerKeypair.publicKey);
-
-    // currency atas for the buyer / seller
-    let buyerItemTokenAccount = await createAssociatedTokenAccount(connection, buyerKeypair, itemMint.publicKey, buyerKeypair.publicKey);
-    let sellerItemTokenAccount = await createAssociatedTokenAccount(connection, sellerKeypair, itemMint.publicKey, sellerKeypair.publicKey);
-
-    // now mint 10k tokens to buyer's currency ata and create the seller's currency ata
-    const numTokens = 10000;
-    tx = new Transaction().add(
-        createMintToCheckedInstruction(
-            itemMint.publicKey,
-            sellerItemTokenAccount,
-            sellerKeypair.publicKey,
-            numTokens * 1e9,
-            9
-        ),
-    );
-    let txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
-    console.log(`minted ${numTokens} tokens to seller's ata: ${sellerItemTokenAccount.toBase58()} \n`);
+  it("creates a single item listing - unit type", async () => {
 
     let currencyMint = NATIVE_MINT;
     let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 5);
-    let quantity = new anchor.BN(9 * 100); // 9 tokens
+
+    // so, selling 9 tokens for 5 sol each
+    let quantity = new anchor.BN(9 * 1e9); // 9 tokens
 
     let [listingPda] = findBazaarListingPda(sellerAccountPda, ++sellerAccountListingIndex, bazaarProg.programId);
-    let listingItemToken = getAssociatedTokenAddressSync(itemMint.publicKey, listingPda, true);
-
-    await sleep(1000);
-
-    let accounts = {
-      listingDomain: listingDomainPda,
-      seller: sellerKeypair.publicKey,
-      sellerAccount: sellerAccountPda,
-      keychain: sellerKeychainPda,
-      listing: listingPda,
-      currency: currencyMint,
-      // proceedsToken: null,
-      proceeds: sellerKeypair.publicKey,
-      item0: itemMint.publicKey,
-      item0SellerToken: sellerItemTokenAccount,
-      item0ListingToken: listingItemToken,
-      item1: null,
-      item1SellerToken: null,
-      item1ListingToken: null,
-      item2: null,
-      item2SellerToken: null,
-      item2ListingToken: null,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    };
-    console.log('accounts: ', accounts);
+    let listingItemToken = getAssociatedTokenAddressSync(item0Mint.publicKey, listingPda, true);
 
     // create the listing
-    tx = await bazaarProg.methods.createListing({price, listingType: {bag: {}}, itemQuantities: [quantity]}).accounts({
+    tx = await bazaarProg.methods.createListing({price, listingType: {unit: {}}, itemQuantities: [quantity]}).accounts({
       listingDomain: listingDomainPda,
       seller: sellerKeypair.publicKey,
       sellerAccount: sellerAccountPda,
@@ -237,8 +243,8 @@ describe("bazaar", () => {
       currency: currencyMint,
       proceedsToken: null,
       proceeds: sellerKeypair.publicKey,
-      item0: itemMint.publicKey,
-      item0SellerToken: sellerItemTokenAccount,
+      item0: item0Mint.publicKey,
+      item0SellerToken: sellerItem0TokenAccount,
       item0ListingToken: listingItemToken,
       item1: null,
       item1SellerToken: null,
@@ -250,6 +256,61 @@ describe("bazaar", () => {
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     }).transaction();
+
+    txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
+
+    console.log(`created listing: ${listingPda.toBase58()}, txid `, txid);
+    const listing = await bazaarProg.account.listing.fetch(listingPda);
+    console.log("listing account: ", listing);
+
+    expect(listing.accountVersion).to.equal(0);
+    expect(listing.bump).is.greaterThan(0);
+    expect(listing.currency.toBase58()).to.equal(currencyMint.toBase58());
+    assert.isTrue('unit' in listing.listingType);
+    assert(listing.items.length == 1);
+    expect(listing.items[0].quantity.toNumber()).to.equal(quantity.toNumber());
+    expect(listing.items[0].itemMint.toBase58()).to.equal(item0Mint.publicKey.toBase58());
+    expect(listing.items[0].itemToken.toBase58()).to.equal(listingItemToken.toBase58());
+    expect(listing.treasury.toBase58()).to.equal(treasury.publicKey.toBase58());
+  });
+
+  it("creates a double item listing - bag type", async () => {
+
+    let currencyMint = NATIVE_MINT;
+    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 5);
+    let item0Quantity = new anchor.BN(9 * 1e9); // 9 tokens
+    let item1Quantity = new anchor.BN(2);       // 2 SFTs
+
+    let [listingPda] = findBazaarListingPda(sellerAccountPda, ++sellerAccountListingIndex, bazaarProg.programId);
+    let listingItem0Token = getAssociatedTokenAddressSync(item0Mint.publicKey, listingPda, true);
+    let listingItem1Token = getAssociatedTokenAddressSync(item1Mint.publicKey, listingPda, true);
+
+    let accounts = {
+      listingDomain: listingDomainPda,
+      seller: sellerKeypair.publicKey,
+      sellerAccount: sellerAccountPda,
+      keychain: sellerKeychainPda,
+      listing: listingPda,
+      currency: currencyMint,
+      proceedsToken: null,
+      proceeds: sellerKeypair.publicKey,
+      item0: item0Mint.publicKey,
+      item0SellerToken: sellerItem0TokenAccount,
+      item0ListingToken: listingItem0Token,
+      item1: item1Mint.publicKey,
+      item1SellerToken: sellerItem1TokenAccount,
+      item1ListingToken: listingItem1Token,
+      item2: null,
+      item2SellerToken: null,
+      item2ListingToken: null,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    };
+
+    // create the listing
+    tx = await bazaarProg.methods.createListing({price, listingType: {bag: {}}, itemQuantities: [item0Quantity, item1Quantity]})
+        .accounts(accounts).transaction();
 
     console.log("create listing tx: ", tx);
     console.log("keys: ", tx.instructions[0].keys);
@@ -264,14 +325,17 @@ describe("bazaar", () => {
     expect(listing.bump).is.greaterThan(0);
     expect(listing.currency.toBase58()).to.equal(currencyMint.toBase58());
     assert.isTrue('bag' in listing.listingType);
-    assert(listing.items.length == 1);
-    expect(listing.items[0].quantity.toNumber()).to.equal(quantity.toNumber());
-    expect(listing.items[0].itemMint.toBase58()).to.equal(itemMint.publicKey.toBase58());
-    expect(listing.items[0].itemToken.toBase58()).to.equal(listingItemToken.toBase58());
+    assert(listing.items.length == 2);
+    expect(listing.items[0].quantity.toNumber()).to.equal(item0Quantity.toNumber());
+    expect(listing.items[1].quantity.toNumber()).to.equal(item1Quantity.toNumber());
+    expect(listing.items[0].itemMint.toBase58()).to.equal(item0Mint.publicKey.toBase58());
+    expect(listing.items[1].itemMint.toBase58()).to.equal(item1Mint.publicKey.toBase58());
+    expect(listing.items[0].itemToken.toBase58()).to.equal(listingItem0Token.toBase58());
+    expect(listing.items[1].itemToken.toBase58()).to.equal(listingItem1Token.toBase58());
     expect(listing.treasury.toBase58()).to.equal(treasury.publicKey.toBase58());
 
-
   });
+
 
 
 });

@@ -71,6 +71,7 @@ pub fn handle_create_listing<'info>(
     listing.currency = ctx.accounts.currency.key();
     listing.bump = *ctx.bumps.get("listing").unwrap();
     listing.treasury = listing_domain.treasury.key();
+    listing.listing_type = args.listing_type;
 
     if ctx.accounts.currency.key() == NATIVE_MINT {
         require!(ctx.accounts.proceeds.is_some(), BazaarError::ProceedsAccountNotSpecified);
