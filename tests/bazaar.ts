@@ -6,7 +6,7 @@ import {
   findKeychainKeyPda,
   findKeychainPda,
   findKeychainStatePda,
-  findListingDomainPda, findSellerAccountPda, sleep
+  findListingDomainPda, findSellerAccountPda
 } from "./utils";
 import {Keypair, LAMPORTS_PER_SOL, SystemProgram, Transaction} from "@solana/web3.js";
 import {Program} from "@project-serum/anchor";
@@ -333,6 +333,12 @@ describe("bazaar", () => {
     expect(listing.items[0].itemToken.toBase58()).to.equal(listingItem0Token.toBase58());
     expect(listing.items[1].itemToken.toBase58()).to.equal(listingItem1Token.toBase58());
     expect(listing.treasury.toBase58()).to.equal(treasury.publicKey.toBase58());
+
+    // check the listing ata token amounts
+    let tokenAmount = await connection.getTokenAccountBalance(listingItem0Token);
+    assert.equal(tokenAmount.value.amount, item0Quantity.toString());
+    tokenAmount = await connection.getTokenAccountBalance(listingItem1Token);
+    assert.equal(tokenAmount.value.amount, item1Quantity.toString());
 
   });
 
