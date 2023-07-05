@@ -48,11 +48,11 @@ pub fn handle_buy(
 
         // transfer the specified number of units to the buyer
         let listing_item_token_ai = ctx.accounts.item_0_listing_token.to_account_info();
-        let auth_item_token_ai = ctx.accounts.item_0_buyer_token.to_account_info();
+        let buyer_item_token_ai = ctx.accounts.item_0_buyer_token.to_account_info();
         let treasury_ai = ctx.accounts.treasury.to_account_info();
         let token_prog_ai = ctx.accounts.token_program.to_account_info();
 
-        transfer_items(listing, listing_item_token_ai, auth_item_token_ai, num_units, treasury_ai, close_listing, token_prog_ai)?;
+        transfer_items(listing, listing_item_token_ai, buyer_item_token_ai, num_units, treasury_ai, close_listing, token_prog_ai)?;
 
     } else {
         // bag: transfer everything
@@ -97,23 +97,18 @@ pub fn handle_buy(
 
     // close the listing if we need to
     if close_listing {
-        let cpi_close_accounts = CloseAccount {
-            account: listing.to_account_info(),
-            destination: ctx.accounts.treasury.to_account_info(),
-            authority: listing.to_account_info(),
-        };
-        let seeds = &[
-            LISTING.as_bytes().as_ref(),
-            listing.seller_account.as_ref(),
-            &listing.listing_index.to_le_bytes(),
-            &[listing.bump],
-        ];
-        let signer = &[&seeds[..]];
-
-        let cpi_ctx = CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(),
-                                                  cpi_close_accounts, signer);
         msg!("Closing listing account");
-        token::close_account(cpi_ctx)?;
+
+        let listing_account_info = listing.to_account_info();
+        let remaining_lamports = listing_account_info.lamports();
+
+        msg!("transferring all lamports out of account (to close) {}: {}", ctx.accounts.treasury.key(), remaining_lamports);
+
+        // transfer sol: https://solanacookbook.com/references/programs.html#how-to-transfer-sol-in-a-program
+
+        // Debit from_account and credit to_account
+        **listing_account_info.try_borrow_mut_lamports()? -= remaining_lamports;
+        **ctx.accounts.treasury.try_borrow_mut_lamports()? += remaining_lamports;
     }
 
     Ok(())
@@ -167,7 +162,7 @@ pub fn handle_payment<'info>(num_units: u64,
             &system_instruction::transfer(
                 buyer.key,
                 &listing.proceeds,
-                listing.price,
+                currency_amount_for_purchase,
             ),
             &[
                 buyer.clone(),
@@ -190,6 +185,7 @@ pub fn handle_payment<'info>(num_units: u64,
         let cpi_ctx = CpiContext::new(token_program.to_account_info(), cpi_accounts);
         token::transfer(cpi_ctx, listing.price)?;
     }
+    msg!("Payment complete");
     Ok(())
 }
 
@@ -221,17 +217,24 @@ pub struct Buy<'info> {
     pub seller_account: Box<Account<'info, SellerAccount>>,
 
     // the currency the listing is being sold for - native mint for straight sol
-    #[account()]
+    #[account(
+        constraint = listing.currency == currency.key()
+    )]
     pub currency: Account<'info, Mint>,
 
     // the token account to deposit the proceeds into - necessary if currency is spl
     #[account(
+        mut,
         token::mint = currency,
+        constraint = listing.proceeds == proceeds_token.key(),
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: this is only specified if the currency is native (will usually just be the seller, but can be any account to send proceeds to)
-    #[account()]
+    #[account(
+        mut,
+        constraint = listing.proceeds == proceeds.key()
+    )]
     pub proceeds: Option<AccountInfo<'info>>,
 
     #[account(

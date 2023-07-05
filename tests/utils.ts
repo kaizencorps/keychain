@@ -56,6 +56,16 @@ export async function createTokenMint(connection: Connection, payer: Keypair, au
   return mintKey;
 }
 
+export async function getSolBalance(connection: Connection, publicKey: PublicKey): Promise<number> {
+  return (await connection.getBalance(publicKey)) / 1e9;
+}
+
+export function isWithinPercentageThreshold(num1, num2, percentage) {
+  var threshold = (Math.abs(num1) + Math.abs(num2)) * (percentage / 100);
+  var difference = Math.abs(num1 - num2);
+  return difference <= threshold;
+}
+
 export async function createNFTMint(connection: Connection, payer: Keypair, authority: PublicKey): Promise<Keypair> {
 
   const lamports = await getMinimumBalanceForRentExemptMint(connection);

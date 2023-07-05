@@ -48,7 +48,8 @@ pub fn handle_create_listing<'info>(
 
     // increment the seller's listing index
     let seller_account = &mut ctx.accounts.seller_account;
-    seller_account.listing_index = seller_account.listing_index.checked_add(1).unwrap();
+    let listing_index =  seller_account.listing_index.checked_add(1).unwrap();
+    seller_account.listing_index = listing_index;
 
     /////// check our inputs
 
@@ -78,6 +79,7 @@ pub fn handle_create_listing<'info>(
     listing.treasury = listing_domain.treasury.key();
     listing.listing_type = args.listing_type;
     listing.seller_account = ctx.accounts.seller_account.key();
+    listing.listing_index = listing_index;
 
     if ctx.accounts.currency.key() == NATIVE_MINT {
         require!(ctx.accounts.proceeds.is_some(), BazaarError::ProceedsAccountNotSpecified);
