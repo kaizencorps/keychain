@@ -167,19 +167,6 @@ describe("bazaar", () => {
     );
     txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
     console.log(`minted ${numTokens} tokens to seller's item token accounts, and ${numTokens} tokens to buyer's currency token account`);
-
-    // tx = new Transaction().add(
-    //     // mint currency to buyer
-    //     createMintToCheckedInstruction(
-    //         currencyMint.publicKey,
-    //         buyerCurrencyTokenAccount,
-    //         buyerKeypair.publicKey,
-    //         numTokens * 1e6,
-    //         6
-    //     ),
-    // );
-    // txid = await provider.sendAndConfirm(tx, [sellerKeypair]);
-    // console.log(`minted ${numTokens} tokens to buyer's currency token account`);
   });
 
 
@@ -257,6 +244,7 @@ describe("bazaar", () => {
     console.log("seller account: ", sellerAccount);
     expect(sellerAccount.accountVersion).to.equal(0);
     expect(sellerAccount.bump).to.be.greaterThan(0);
+    expect(sellerAccount.numSales).to.equal(0);
     expect(sellerAccount.listingIndex).to.equal(0);
     expect(sellerAccount.keychain.toBase58()).to.equal(sellerKeychainPda.toBase58());
     sellerAccountListingIndex = 0;
@@ -370,6 +358,7 @@ describe("bazaar", () => {
 
     console.log(`buyer sol balance: ${buyerSolBalance}, seller sol balance: ${sellerSolBalance}, treasury sol balance: ${treasurySolBalance}`);
 
+    /// MAKE PURCHASE
     txid = await provider.sendAndConfirm(tx, [buyerKeypair], {skipPreflight: true});
     console.log(`purchased listing: ${listingPda.toBase58()}, txid `, txid);
     console.log(`after purchase: buyer sol balance: ${buyerSolBalance}, seller sol balance: ${sellerSolBalance}, treasury sol balance: ${treasurySolBalance}`);
@@ -393,6 +382,11 @@ describe("bazaar", () => {
 
     // treasury didn't get any sol cause listing not closed
     expect(newTreasurySolBalance).is.equal(treasurySolBalance);
+
+    let sellerAccount = await bazaarProg.account.sellerAccount.fetch(sellerAccountPda);
+    console.log("seller account: ", sellerAccount);
+    expect(sellerAccount.numSales).to.equal(1);
+    expect(sellerAccount.listingIndex).to.equal(1);
 
    //////////// update price  - seller updates the price
 
@@ -421,7 +415,7 @@ describe("bazaar", () => {
 
     console.log(`buyer sol balance: ${buyerSolBalance}, seller sol balance: ${sellerSolBalance}, treasury sol balance: ${treasurySolBalance}`);
 
-    ////////// SUBMIT PURCHASE TX
+    ////////// SUBMIT PURCHASE TX #2 - buyer purchases remaining units
     txid = await provider.sendAndConfirm(tx, [buyerKeypair], {skipPreflight: true});
 
     console.log(`buyer purchased remaining units in listing: ${listingPda.toBase58()}, txid `, txid);
@@ -454,6 +448,12 @@ describe("bazaar", () => {
 
     // now treasury got some sol from closed listing
     expect(newTreasurySolBalance).is.greaterThan(treasurySolBalance);
+
+    // seller gets credited for another sale
+    sellerAccount = await bazaarProg.account.sellerAccount.fetch(sellerAccountPda);
+    console.log("seller account: ", sellerAccount);
+    expect(sellerAccount.numSales).to.equal(2);
+    expect(sellerAccount.listingIndex).to.equal(1);
   });
 
   it("creates a double item listing - bag type", async () => {
@@ -496,6 +496,7 @@ describe("bazaar", () => {
     tx = await bazaarProg.methods.createListing({price, listingType: {bag: {}}, itemQuantities: [item0Quantity, item1Quantity]})
         .accounts(accounts).transaction();
 
+    ///////// CREATE LISTING
     txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
 
     console.log(`created listing: ${listingPda.toBase58()}, txid `, txid);
@@ -554,6 +555,7 @@ describe("bazaar", () => {
 
     console.log(`buyer sol balance: ${buyerSolBalance}, seller sol balance: ${sellerSolBalance}, treasury sol balance: ${treasurySolBalance}`);
 
+    //////// BUYER MAKES PURCHASE
     txid = await provider.sendAndConfirm(tx, [buyerKeypair], {skipPreflight: true});
     console.log(`purchased listing: ${listingPda.toBase58()}, txid `, txid);
 
@@ -583,6 +585,13 @@ describe("bazaar", () => {
 
     // treasury got some sol
     expect(newTreasurySolBalance).is.greaterThan(treasurySolBalance);
+
+    // seller gets credited for another sale
+    let sellerAccount = await bazaarProg.account.sellerAccount.fetch(sellerAccountPda);
+    console.log("seller account: ", sellerAccount);
+    expect(sellerAccount.numSales).to.equal(3);
+    expect(sellerAccount.listingIndex).to.equal(2);
+
   });
 
   it("creates a triple item listing - bag type w/custom currency (with 1 token bag)", async () => {
@@ -723,7 +732,108 @@ describe("bazaar", () => {
 
     // treasury got some sol
     expect(newTreasurySolBalance).is.greaterThan(treasurySolBalance);
-  })
+
+    // seller gets credited for another sale
+    let sellerAccount = await bazaarProg.account.sellerAccount.fetch(sellerAccountPda);
+    console.log("seller account: ", sellerAccount);
+    expect(sellerAccount.numSales).to.equal(4);
+    expect(sellerAccount.listingIndex).to.equal(3);
+  });
+
+  it("should be able to cancel a listing (delist)", async () => {
+
+    let listingCurrency = NATIVE_MINT;
+    let price = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.5);
+
+    let listingQty = new anchor.BN(9); // 9 items
+
+    let [listingPda] = findBazaarListingPda(sellerAccountPda, ++sellerAccountListingIndex, bazaarProg.programId);
+    let listingItem1Token = getAssociatedTokenAddressSync(item1Mint.publicKey, listingPda, true);
+
+    let createListingAccounts = {
+      listingDomain: listingDomainPda,
+      seller: sellerKeypair.publicKey,
+      sellerAccount: sellerAccountPda,
+      keychain: sellerKeychainPda,
+      listing: listingPda,
+      currency: listingCurrency,
+      proceedsToken: null,
+      proceeds: sellerKeypair.publicKey,
+      item0: item1Mint.publicKey,
+      item0SellerToken: sellerItem1TokenAccount,
+      item0ListingToken: listingItem1Token,
+      item1: null,
+      item1SellerToken: null,
+      item1ListingToken: null,
+      item2: null,
+      item2SellerToken: null,
+      item2ListingToken: null,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    };
+
+    // try to create the listing (will fail cause we're unit listing a token)
+    tx = await bazaarProg.methods.createListing({price, listingType: {unit: {}}, itemQuantities: [listingQty]}).accounts(createListingAccounts).transaction();
+
+    //////// CREATE THE LISTING
+    txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
+    console.log(`created listing: ${listingPda.toBase58()}, txid `, txid);
+
+    let listing = await bazaarProg.account.listing.fetchNullable(listingPda);
+    expect(listing).is.not.null;
+
+    let sellerCurrencyBalance = await getSolBalance(connection, sellerKeypair.publicKey);
+    let treasurySolBalance = await getSolBalance(connection, treasury.publicKey);
+    let sellerItem1TokenBalance = await connection.getTokenAccountBalance(sellerItem1TokenAccount);
+
+    // now seller delists
+    let delistAccounts = {
+      listing: listingPda,
+      seller: sellerKeypair.publicKey,
+      sellerAccount: sellerAccountPda,
+      keychain: sellerKeychainPda,
+      item0: item1Mint.publicKey,
+      item0SellerToken: sellerItem1TokenAccount,
+      item0ListingToken: listingItem1Token,
+      item1: null,
+      item1SellerToken: null,
+      item1ListingToken: null,
+      item2: null,
+      item2SellerToken: null,
+      item2ListingToken: null,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    };
+
+    tx = await bazaarProg.methods.delist().accounts(delistAccounts).transaction();
+
+    ///////// SUBMIT DELIST TX
+    txid = await provider.sendAndConfirm(tx, [sellerKeypair], {skipPreflight: true});
+
+    // listing closed
+    listing = await bazaarProg.account.listing.fetchNullable(listingPda);
+    expect(listing).is.null;
+
+    let newSellerCurrencyBalance = await getSolBalance(connection, sellerKeypair.publicKey);
+    let newTreasurySolBalance = await getSolBalance(connection, treasury.publicKey);
+    let newSellerItem1TokenBalance = await connection.getTokenAccountBalance(sellerItem1TokenAccount);
+
+    // seller get his listing sol back
+    expect(newSellerCurrencyBalance).is.greaterThan(sellerCurrencyBalance);
+    // treasury stays the same
+    expect(newTreasurySolBalance).equals(treasurySolBalance);
+    // seller gets his item back
+    expect(newSellerItem1TokenBalance.value.uiAmount).equals(sellerItem1TokenBalance.value.uiAmount + listingQty.toNumber());
+
+     // seller doesn't get credit for sale - but listing index was incremented
+    let sellerAccount = await bazaarProg.account.sellerAccount.fetch(sellerAccountPda);
+    console.log("seller account: ", sellerAccount);
+    expect(sellerAccount.numSales).to.equal(4);
+    expect(sellerAccount.listingIndex).to.equal(4);
+  });
+
 
 });
 

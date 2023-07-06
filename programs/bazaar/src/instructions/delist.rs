@@ -101,6 +101,7 @@ pub struct Delist<'info> {
     pub item_0_seller_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
+        mut,
         associated_token::mint = item_0,
         associated_token::authority = listing
     )]
@@ -119,6 +120,7 @@ pub struct Delist<'info> {
     pub item_1_seller_token: Option<Box<Account<'info, TokenAccount>>>,
 
     #[account(
+        mut,
         associated_token::mint = item_1,
         associated_token::authority = listing
     )]
@@ -137,6 +139,7 @@ pub struct Delist<'info> {
     pub item_2_seller_token: Option<Box<Account<'info, TokenAccount>>>,
 
     #[account(
+        mut,
         associated_token::mint = item_2,
         associated_token::authority = listing
     )]
