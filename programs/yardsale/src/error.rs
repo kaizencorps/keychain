@@ -6,8 +6,8 @@ pub enum YardsaleError {
     NotAuthorized,
     #[msg("Invalid Keychain")]
     InvalidKeychain,
-    #[msg("Invalid item")]
-    InvalidItem,
+    #[msg("Empty token account")]
+    EmptyTokenAccount,
     #[msg("Invalid price")]
     InvalidPrice,
     #[msg("Sale proceeds token account not specified")]

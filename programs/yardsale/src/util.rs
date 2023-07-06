@@ -31,10 +31,10 @@ pub fn assert_decode_metadata<'info>(
 
 // transfers an item out of the listing's token account and closes it
 pub fn transfer_item_and_close<'a, 'b>(listing: &Box<Account<'a, Listing>>,
-                                   listing_item_token_ai: AccountInfo<'b>,
-                                   to_token_ai: AccountInfo<'b>,
-                                   lamports_claimer_ai: AccountInfo<'a>,
-                                   token_program: AccountInfo<'a>) -> Result<()>
+                                       listing_item_token_ai: AccountInfo<'b>,
+                                       to_token_ai: AccountInfo<'b>,
+                                       lamports_claimer_ai: AccountInfo<'a>,
+                                       token_program: AccountInfo<'a>) -> Result<()>
     where 'a: 'b, 'b: 'a {
 
     let seeds = &[
@@ -413,17 +413,17 @@ pub fn close_listing_owned_account<'info>(
 
 // properly populate a newly created listing account
 pub fn create_listing(listing: &mut Box<Account<Listing>>,
-                  listing_bump: u8,
-                  item: Pubkey,
-                  listing_item_token: Pubkey,
-                  domain: String,
-                  keychain: String,
-                  currency: Pubkey,
-                  treasury: Pubkey,
-                  proceeds: &Option<AccountInfo>,
-                  proceeds_token: &Option<Account<TokenAccount>>,
-                  item_type: ItemType,
-                  price: u64) -> Result<()> {
+                      listing_bump: u8,
+                      item: Pubkey,
+                      listing_item_token: Pubkey,
+                      domain: String,
+                      keychain: String,
+                      currency: Pubkey,
+                      treasury: Pubkey,
+                      proceeds: &Option<AccountInfo>,
+                      proceeds_token: &Option<Account<TokenAccount>>,
+                      item_type: ItemType,
+                      price: u64) -> Result<()> {
     listing.price = price;
     listing.item = item;
     listing.item_token = listing_item_token;

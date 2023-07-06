@@ -46,8 +46,8 @@ pub mod yardsale {
 
     // list an item
     pub fn list_item(ctx: Context<ListItem>, price: u64) -> Result<()> {
-        // make sure the item exists in the from account
-        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
+        // make sure the item exists in the from account, since this might be an SFT, we check >= 1
+        require!(ctx.accounts.authority_item_token.amount >= 1, YardsaleError::EmptyTokenAccount);
 
         // should we disallow a price of 0 ..?
         // require!(price > 0, YardsaleError::InvalidPrice);
@@ -164,7 +164,7 @@ pub mod yardsale {
     ) -> Result<()> {
 
         // make sure the item exists in the from account
-        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
+        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::EmptyTokenAccount);
 
         // first, transfer the item to the listing ata
         let rem_acc = &mut ctx.remaining_accounts.iter();
@@ -290,11 +290,11 @@ pub mod yardsale {
     }
 
     pub fn delist_cnft<'info>(ctx: Context<'_, '_, '_, 'info, DelistCompressedNft<'info>>,
-                                root: [u8; 32],
-                                data_hash: [u8; 32],
-                                creator_hash: [u8; 32],
-                                nonce: u64,
-                                index: u32,) -> Result<()> {
+                              root: [u8; 32],
+                              data_hash: [u8; 32],
+                              creator_hash: [u8; 32],
+                              nonce: u64,
+                              index: u32,) -> Result<()> {
 
         msg!("attempting to delist nft {} from tree {} to new owner {}", index, ctx.accounts.merkle_tree.key(), ctx.accounts.authority.key());
 

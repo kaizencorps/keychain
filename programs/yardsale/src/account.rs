@@ -49,8 +49,6 @@ impl Listing {
             191; // extra space
 }
 
-
-
 // --------------------------------------- replicating mplex type for anchor IDL export
 //have to do this because anchor won't include foreign structs in the IDL
 

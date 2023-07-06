@@ -43,38 +43,38 @@ pub struct ListItem<'info> {
     //      OR: create a domain for yardsale as well ..?
 
     #[account(
-        constraint = domain.name == keychain.domain
+    constraint = domain.name == keychain.domain
     )]
     pub domain: Box<Account<'info, CurrentDomain>>,
 
     #[account(
-        constraint = keychain.has_key(&authority.key()),
+    constraint = keychain.has_key(&authority.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
     pub item: Box<Account<'info, Mint>>,
 
     #[account(
-        mut,
-        token::mint = item,
-        token::authority = authority
+    mut,
+    token::mint = item,
+    token::authority = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        init,
-        payer = authority,
-        seeds = [item.key().as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
-        bump,
-        space = 8 + Listing::MAX_SIZE,
+    init,
+    payer = authority,
+    seeds = [item.key().as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+    bump,
+    space = 8 + Listing::MAX_SIZE,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-        init,
-        payer = authority,
-        associated_token::mint = item,
-        associated_token::authority = listing
+    init,
+    payer = authority,
+    associated_token::mint = item,
+    associated_token::authority = listing
     )]
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
@@ -84,7 +84,7 @@ pub struct ListItem<'info> {
 
     // the token account to deposit the proceeds into - necessary if currency is spl
     #[account(
-        token::mint = currency,
+    token::mint = currency,
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
@@ -106,15 +106,15 @@ pub struct ListItem<'info> {
 pub struct DelistItem<'info> {
 
     #[account(
-        mut,
-        has_one = item,
-        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
-        close = authority,
+    mut,
+    has_one = item,
+    constraint = listing.item == item.key() && listing.item_token == listing_item_token.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+    close = authority,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-        constraint = keychain.has_key(&authority.key()),
+    constraint = keychain.has_key(&authority.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
@@ -122,16 +122,16 @@ pub struct DelistItem<'info> {
 
     // the token account the item gets returned to
     #[account(
-        mut,
-        token::mint = item,
-        token::authority = authority
+    mut,
+    token::mint = item,
+    token::authority = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        mut,
-        associated_token::mint = item,
-        associated_token::authority = listing
+    mut,
+    associated_token::mint = item,
+    associated_token::authority = listing
     )]
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
@@ -146,14 +146,14 @@ pub struct DelistItem<'info> {
 pub struct UpdatePrice<'info> {
 
     #[account(
-        mut,
-        has_one = item,
-        constraint = listing.item == item.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+    mut,
+    has_one = item,
+    constraint = listing.item == item.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-        constraint = keychain.has_key(&authority.key()),
+    constraint = keychain.has_key(&authority.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
@@ -168,21 +168,21 @@ pub struct UpdatePrice<'info> {
 pub struct ListCompressedNft<'info> {
 
     #[account(
-        constraint = domain.name == keychain.domain
+    constraint = domain.name == keychain.domain
     )]
     pub domain: Box<Account<'info, CurrentDomain>>,
 
     #[account(
-        constraint = keychain.has_key(& leaf_owner.key()),
+    constraint = keychain.has_key(& leaf_owner.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
     #[account(
-        init,
-        payer = leaf_owner,
-        seeds = [asset_id.as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
-        bump,
-        space = 8 + Listing::MAX_SIZE,
+    init,
+    payer = leaf_owner,
+    seeds = [asset_id.as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+    bump,
+    space = 8 + Listing::MAX_SIZE,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
@@ -202,16 +202,16 @@ pub struct ListCompressedNft<'info> {
 
     // tree stuff
     #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key(),
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Box<Account<'info, TreeConfig>>,
 
     #[account(
-        mut,
-        owner = compression_program.key()
+    mut,
+    owner = compression_program.key()
     )]
     /// CHECK: This account is modified in the downstream program
     pub merkle_tree: UncheckedAccount<'info>,
@@ -230,38 +230,38 @@ pub struct ListCompressedNft<'info> {
 pub struct ListProgrammableNft<'info> {
 
     #[account(
-        constraint = domain.name == keychain.domain
+    constraint = domain.name == keychain.domain
     )]
     pub domain: Box<Account<'info, CurrentDomain>>,
 
     #[account(
-        constraint = keychain.has_key(&authority.key()),
+    constraint = keychain.has_key(&authority.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
     pub item: Box<Account<'info, Mint>>,
 
     #[account(
-        mut,
-        token::mint = item,
-        token::authority = authority
+    mut,
+    token::mint = item,
+    token::authority = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        init,
-        payer = authority,
-        seeds = [item.key().as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
-        bump,
-        space = 8 + Listing::MAX_SIZE,
+    init,
+    payer = authority,
+    seeds = [item.key().as_ref(), LISTINGS.as_bytes().as_ref(), keychain.name.as_bytes().as_ref(), keychain.domain.as_bytes().as_ref(), YARDSALE.as_bytes().as_ref()],
+    bump,
+    space = 8 + Listing::MAX_SIZE,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-        init,
-        payer = authority,
-        associated_token::mint = item,
-        associated_token::authority = listing
+    init,
+    payer = authority,
+    associated_token::mint = item,
+    associated_token::authority = listing
     )]
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
@@ -271,7 +271,7 @@ pub struct ListProgrammableNft<'info> {
 
     // the token account to deposit the proceeds into - necessary if currency is spl
     #[account(
-        token::mint = currency,
+    token::mint = currency,
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
@@ -294,14 +294,14 @@ pub struct ListProgrammableNft<'info> {
 
     /// CHECK: assert_decode_metadata + seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub item_metadata: UncheckedAccount<'info>,
 
@@ -309,43 +309,43 @@ pub struct ListProgrammableNft<'info> {
     /// CHECK: seeds below
     #[account(
     seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::EDITION.as_bytes(),
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::EDITION.as_bytes(),
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub edition: UncheckedAccount<'info>,
 
     /// CHECK: seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            authority_item_token.key().as_ref()
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+    authority_item_token.key().as_ref()
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub authority_token_record: UncheckedAccount<'info>,
 
     /// CHECK: seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            listing_item_token.key().as_ref()
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+    listing_item_token.key().as_ref()
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub listing_token_record: UncheckedAccount<'info>,
 
@@ -370,14 +370,14 @@ pub struct ListProgrammableNft<'info> {
 pub struct DelistCompressedNft<'info> {
 
     #[account(
-        mut,
-        constraint = listing.domain == keychain.domain && listing.keychain == keychain.name,
-        close = authority,
+    mut,
+    constraint = listing.domain == keychain.domain && listing.keychain == keychain.name,
+    close = authority,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-        constraint = keychain.has_key(&authority.key()),
+    constraint = keychain.has_key(&authority.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
@@ -386,16 +386,16 @@ pub struct DelistCompressedNft<'info> {
 
     // tree stuff
     #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key(),
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Box<Account<'info, TreeConfig>>,
 
     #[account(
-        mut,
-        owner = compression_program.key()
+    mut,
+    owner = compression_program.key()
     )]
     /// CHECK: This account is modified in the downstream program
     pub merkle_tree: UncheckedAccount<'info>,
@@ -412,15 +412,15 @@ pub struct DelistCompressedNft<'info> {
 pub struct DelistPNFT<'info> {
 
     #[account(
-        mut,
-        has_one = item,
-        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
-        close = seller,
+    mut,
+    has_one = item,
+    constraint = listing.item == item.key() && listing.item_token == listing_item_token.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+    close = seller,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-        constraint = keychain.has_key(&seller.key()),
+    constraint = keychain.has_key(&seller.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 
@@ -428,16 +428,16 @@ pub struct DelistPNFT<'info> {
 
     // the token account the item gets returned to
     #[account(
-        mut,
-        token::mint = item,
-        token::authority = seller
+    mut,
+    token::mint = item,
+    token::authority = seller
     )]
     pub seller_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        mut,
-        associated_token::mint = item,
-        associated_token::authority = listing
+    mut,
+    associated_token::mint = item,
+    associated_token::authority = listing
     )]
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
@@ -446,58 +446,58 @@ pub struct DelistPNFT<'info> {
 
     /// CHECK: this will be handled by the metaplex code
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub item_metadata: AccountInfo<'info>,
 
     /// CHECK: this will be handled by the metaplex code
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::EDITION.as_bytes(),
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::EDITION.as_bytes(),
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub edition: AccountInfo<'info>,
 
     /// CHECK: seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            seller_item_token.key().as_ref()
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+    seller_item_token.key().as_ref()
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub seller_token_record: UncheckedAccount<'info>,
 
     /// CHECK: seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            listing_item_token.key().as_ref()
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+    listing_item_token.key().as_ref()
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub listing_token_record: UncheckedAccount<'info>,
 
@@ -527,10 +527,10 @@ pub struct DelistPNFT<'info> {
 pub struct PurchaseProgrammableNft<'info> {
 
     #[account(
-        mut,
-        has_one = item,
-        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key(),
-        close = treasury,
+    mut,
+    has_one = item,
+    constraint = listing.item == item.key() && listing.item_token == listing_item_token.key(),
+    close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
@@ -538,94 +538,94 @@ pub struct PurchaseProgrammableNft<'info> {
 
     /// CHECK: this will be handled by the metaplex code
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub item_metadata: AccountInfo<'info>,
 
     /// CHECK: this will be handled by the metaplex code
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::EDITION.as_bytes(),
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::EDITION.as_bytes(),
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub edition: AccountInfo<'info>,
 
     /// CHECK: seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            buyer_item_token.key().as_ref()
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+    buyer_item_token.key().as_ref()
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub buyer_token_record: UncheckedAccount<'info>,
 
     /// CHECK: seeds below
     #[account(
-        mut,
-        seeds=[
-            mpl_token_metadata::state::PREFIX.as_bytes(),
-            mpl_token_metadata::id().as_ref(),
-            item.key().as_ref(),
-            mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
-            listing_item_token.key().as_ref()
-        ],
-        seeds::program = mpl_token_metadata::id(),
-        bump
+    mut,
+    seeds=[
+    mpl_token_metadata::state::PREFIX.as_bytes(),
+    mpl_token_metadata::id().as_ref(),
+    item.key().as_ref(),
+    mpl_token_metadata::state::TOKEN_RECORD_SEED.as_bytes(),
+    listing_item_token.key().as_ref()
+    ],
+    seeds::program = mpl_token_metadata::id(),
+    bump
     )]
     pub listing_token_record: UncheckedAccount<'info>,
 
     #[account(
-        mut,
-        associated_token::mint = item,
-        associated_token::authority = listing
+    mut,
+    associated_token::mint = item,
+    associated_token::authority = listing
     )]
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        mut,
-        token::mint = item,
-        token::authority = buyer
+    mut,
+    token::mint = item,
+    token::authority = buyer
     )]
     pub buyer_item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - optional cause if it's missing then listing is in sol
 
     #[account(
-        constraint = listing.currency == currency.key(),
+    constraint = listing.currency == currency.key(),
     )]
     pub currency: Account<'info, Mint>,
 
     // needed if the currency is spl
     #[account(
-        mut,
-        token::mint = currency,
-        constraint = listing.proceeds == proceeds_token.key(),
+    mut,
+    token::mint = currency,
+    constraint = listing.proceeds == proceeds_token.key(),
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: this is only specified if the currency is native
     #[account(
-        mut,
-        constraint = listing.proceeds == proceeds.key(),
+    mut,
+    constraint = listing.proceeds == proceeds.key(),
     )]
     pub proceeds: Option<AccountInfo<'info>>,
 
@@ -634,16 +634,16 @@ pub struct PurchaseProgrammableNft<'info> {
 
     // needed if the currency is spl: this is the buyer's token account
     #[account(
-        mut,
-        token::mint = currency,
-        token::authority = buyer
+    mut,
+    token::mint = currency,
+    token::authority = buyer
     )]
     pub buyer_currency_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: just sending lamports here when closing the listing
     #[account(
-        mut,
-        constraint = listing.treasury == treasury.key(),
+    mut,
+    constraint = listing.treasury == treasury.key(),
     )]
     pub treasury: AccountInfo<'info>,
 
@@ -674,43 +674,43 @@ pub struct PurchaseProgrammableNft<'info> {
 pub struct PurchaseCompressedNft<'info> {
 
     #[account(
-        mut,
-        close = treasury,
+    mut,
+    close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     /// CHECK: just sending lamports here when closing the listing
     #[account(
-        mut,
-        constraint = listing.treasury == treasury.key(),
+    mut,
+    constraint = listing.treasury == treasury.key(),
     )]
     pub treasury: AccountInfo<'info>,
 
     #[account(
-        constraint = listing.currency == currency.key(),
+    constraint = listing.currency == currency.key(),
     )]
     pub currency: Account<'info, Mint>,
 
     // needed if the currency is spl
     #[account(
-        mut,
-        token::mint = currency,
-        constraint = listing.proceeds == proceeds_token.key(),
+    mut,
+    token::mint = currency,
+    constraint = listing.proceeds == proceeds_token.key(),
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: this is only specified if the currency is native
     #[account(
-        mut,
-        constraint = listing.proceeds == proceeds.key(),
+    mut,
+    constraint = listing.proceeds == proceeds.key(),
     )]
     pub proceeds: Option<AccountInfo<'info>>,
 
     // needed if the currency is spl: this is the buyer's token account
     #[account(
-        mut,
-        token::mint = currency,
-        token::authority = new_leaf_owner
+    mut,
+    token::mint = currency,
+    token::authority = new_leaf_owner
     )]
     pub buyer_currency_token: Option<Account<'info, TokenAccount>>,
 
@@ -718,16 +718,16 @@ pub struct PurchaseCompressedNft<'info> {
 
     // tree stuff
     #[account(
-        seeds = [merkle_tree.key().as_ref()],
-        bump,
-        seeds::program = bubblegum_program.key(),
+    seeds = [merkle_tree.key().as_ref()],
+    bump,
+    seeds::program = bubblegum_program.key(),
     )]
     /// CHECK: This account is neither written to nor read from.
     pub tree_authority: Box<Account<'info, TreeConfig>>,
 
     #[account(
-        mut,
-        owner = compression_program.key()
+    mut,
+    owner = compression_program.key()
     )]
     /// CHECK: This account is modified in the downstream program
     pub merkle_tree: UncheckedAccount<'info>,
@@ -747,48 +747,48 @@ pub struct PurchaseCompressedNft<'info> {
 pub struct PurchaseItem<'info> {
 
     #[account(
-        mut,
-        has_one = item,
-        constraint = listing.item == item.key() && listing.item_token == listing_item_token.key(),
-        close = treasury,
+    mut,
+    has_one = item,
+    constraint = listing.item == item.key() && listing.item_token == listing_item_token.key(),
+    close = treasury,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     pub item: Box<Account<'info, Mint>>,
 
     #[account(
-        mut,
-        associated_token::mint = item,
-        associated_token::authority = listing
+    mut,
+    associated_token::mint = item,
+    associated_token::authority = listing
     )]
     pub listing_item_token: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        mut,
-        associated_token::mint = item,
-        associated_token::authority = authority
+    mut,
+    associated_token::mint = item,
+    associated_token::authority = authority
     )]
     pub authority_item_token: Box<Account<'info, TokenAccount>>,
 
     // the currency the listing is being sold for - optional cause if it's missing then listing is in sol
 
     #[account(
-        constraint = listing.currency == currency.key(),
+    constraint = listing.currency == currency.key(),
     )]
     pub currency: Box<Account<'info, Mint>>,
 
     // needed if the currency is spl
     #[account(
-        mut,
-        token::mint = currency,
-        constraint = listing.proceeds == proceeds_token.key(),
+    mut,
+    token::mint = currency,
+    constraint = listing.proceeds == proceeds_token.key(),
     )]
     pub proceeds_token: Option<Account<'info, TokenAccount>>,
 
     /// CHECK: this is only specified if the currency is native
     #[account(
-        mut,
-        constraint = listing.proceeds == proceeds.key(),
+    mut,
+    constraint = listing.proceeds == proceeds.key(),
     )]
     pub proceeds: Option<AccountInfo<'info>>,
 
@@ -806,8 +806,8 @@ pub struct PurchaseItem<'info> {
 
     /// CHECK: just sending lamports here when closing the listing
     #[account(
-        mut,
-        constraint = listing.treasury == treasury.key(),
+    mut,
+    constraint = listing.treasury == treasury.key(),
     )]
     pub treasury: AccountInfo<'info>,
 
