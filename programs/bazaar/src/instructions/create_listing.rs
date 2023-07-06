@@ -182,8 +182,6 @@ fn check_item_quantities(accounts: &CreateListing<'_>, item_quantities: &[u64]) 
 #[derive(Accounts)]
 pub struct CreateListing<'info> {
 
-    // todo: specify keychain for listing
-
     #[account(mut)]
     pub listing_domain: Box<Account<'info, ListingDomain>>,
 

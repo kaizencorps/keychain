@@ -17,7 +17,7 @@ use spl_token::native_mint::ID as NATIVE_MINT;
 
 
 use crate::common::constant::{CURRENT_SELLER_VERSION, LISTING};
-use crate::common::util::transfer_items;
+use crate::common::util::transfer_items_out;
 
 
 pub fn handle_buy(
@@ -52,7 +52,7 @@ pub fn handle_buy(
         let treasury_ai = ctx.accounts.treasury.to_account_info();
         let token_prog_ai = ctx.accounts.token_program.to_account_info();
 
-        transfer_items(listing, listing_item_token_ai, buyer_item_token_ai, num_units, treasury_ai, close_listing, token_prog_ai)?;
+        transfer_items_out(listing, listing_item_token_ai, buyer_item_token_ai, num_units, treasury_ai, close_listing, token_prog_ai)?;
 
     } else {
         // bag: transfer everything
@@ -87,7 +87,7 @@ pub fn handle_buy(
             let treasury_ai = ctx.accounts.treasury.to_account_info();
             let token_prog_ai = ctx.accounts.token_program.to_account_info();
 
-            transfer_items(listing, listing_item_token_ai, buyer_item_token_ai, listing.items[i].quantity, treasury_ai, true, token_prog_ai)?;
+            transfer_items_out(listing, listing_item_token_ai, buyer_item_token_ai, listing.items[i].quantity, treasury_ai, true, token_prog_ai)?;
         }
     }
 
@@ -149,7 +149,10 @@ pub fn handle_payment<'info>(num_units: u64,
             require!(listing.items[0].quantity >= num_units, BazaarError::InsufficientUnits);
             listing.price.checked_mul(num_units).unwrap()
         },
-        ListingType::BAG => listing.price,
+        ListingType::BAG => {
+            require!(num_units == 1, BazaarError::InvalidItemQuantity);
+            listing.price
+        },
     };
 
     if listing.currency == NATIVE_MINT {

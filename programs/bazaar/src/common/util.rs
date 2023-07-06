@@ -7,13 +7,13 @@ use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer}
 
 
 // transfers an item out of the listing's token account and potentially closes it
-pub fn transfer_items<'a, 'b>(listing: &Box<Account<'a, Listing>>,
-                              listing_item_token_ai: AccountInfo<'b>,
-                              to_token_ai: AccountInfo<'b>,
-                              amount: u64,
-                              lamports_claimer_ai: AccountInfo<'a>,
-                              close_token: bool,
-                              token_program: AccountInfo<'a>) -> Result<()>
+pub fn transfer_items_out<'a, 'b>(listing: &Box<Account<'a, Listing>>,
+                                  listing_item_token_ai: AccountInfo<'b>,
+                                  to_token_ai: AccountInfo<'b>,
+                                  amount: u64,
+                                  lamports_claimer_ai: AccountInfo<'a>,
+                                  close_token: bool,
+                                  token_program: AccountInfo<'a>) -> Result<()>
     where 'a: 'b, 'b: 'a {
 
     let seeds = &[

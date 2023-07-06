@@ -10,6 +10,8 @@ use instructions::{
     create_listing::*,
     create_listing_domain::*,
     create_seller::*,
+    delist::*,
+    update_listing::*,
     buy::*,
 };
 
@@ -48,6 +50,20 @@ pub mod bazaar {
     ) -> Result<()> {
         handle_buy(ctx, num_items)
     }
+
+    pub fn delist(
+        ctx: Context<Delist>,
+    ) -> Result<()> {
+        handle_delist(ctx)
+    }
+
+    pub fn update_listing(
+        ctx: Context<UpdateListing>,
+        price: u64
+    ) -> Result<()> {
+        handle_update_listing(ctx, price)
+    }
+
 }
 
 #[derive(Accounts)]

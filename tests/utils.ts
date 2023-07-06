@@ -60,6 +60,15 @@ export async function getSolBalance(connection: Connection, publicKey: PublicKey
   return (await connection.getBalance(publicKey)) / 1e9;
 }
 
+export async function getTokenBalance(connection: Connection, publicKey: PublicKey, numDecimals = 9): Promise<number> {
+  const tokenAmount = await connection.getTokenAccountBalance(publicKey);
+  if (tokenAmount) {
+    return new anchor.BN(tokenAmount.value.amount).div(new anchor.BN(Math.pow(10, numDecimals))).toNumber();
+  } else {
+    return 0;
+  }
+}
+
 export function isWithinPercentageThreshold(num1, num2, percentage) {
   var threshold = (Math.abs(num1) + Math.abs(num2)) * (percentage / 100);
   var difference = Math.abs(num1 - num2);
