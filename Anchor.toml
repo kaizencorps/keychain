@@ -9,7 +9,7 @@ keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 #profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
 #yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
 yardsale = "xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W"
-bazaar = "EQQ46qSk1pZKVEqsejCyAvFenNQ1XTnZie4RfTXPTmgs"
+bazaar = "bazzHtCvoPjpkz3dtSsmYChsbBa7ZPkjQ5xLAMYgBU6"
 
 [programs.devnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
@@ -18,7 +18,7 @@ keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 #profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
 yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
 #yardsale = "xxzSBWCjaRWKmjqGxbxmEuhqocbaW4aUW1EzFfERS9W"
-bazaar = "EQQ46qSk1pZKVEqsejCyAvFenNQ1XTnZie4RfTXPTmgs"
+bazaar = "bazzHtCvoPjpkz3dtSsmYChsbBa7ZPkjQ5xLAMYgBU6"
 
 [programs.mainnet]
 #keychain = "KeyNfJK4cXSjBof8Tg1aEDChUMea4A7wCzLweYFRAoN"
@@ -26,7 +26,7 @@ bazaar = "EQQ46qSk1pZKVEqsejCyAvFenNQ1XTnZie4RfTXPTmgs"
 keychain = "keyKitXGRWbPhF7RkMhNk47CqcFWPqAhMuMjVwapS3K"
 #profile = "ProoXffuU4NJWstjWgFYqauFFatDMG9xHETuRMjKMLt"
 yardsale = "yar3RNWQaixwFAcAXZ4wySQAiyuSxSQYGCp4AjAotM1"
-bazaar = "EQQ46qSk1pZKVEqsejCyAvFenNQ1XTnZie4RfTXPTmgs"
+bazaar = "bazzHtCvoPjpkz3dtSsmYChsbBa7ZPkjQ5xLAMYgBU6"
 
 [registry]
 url = "https://api.apr.dev"
