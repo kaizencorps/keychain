@@ -188,7 +188,6 @@ describe("bazaar", () => {
           programData: programDataAccount,
           systemProgram: anchor.web3.SystemProgram.programId,
           listingDomain: listingDomainPda,
-          systemProgram: anchor.web3.SystemProgram.programId,
         })
         .rpc();
 
