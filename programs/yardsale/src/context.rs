@@ -146,14 +146,14 @@ pub struct DelistItem<'info> {
 pub struct UpdatePrice<'info> {
 
     #[account(
-    mut,
-    has_one = item,
-    constraint = listing.item == item.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
+        mut,
+        has_one = item,
+        constraint = listing.item == item.key() && listing.domain == keychain.domain && listing.keychain == keychain.name,
     )]
     pub listing: Box<Account<'info, Listing>>,
 
     #[account(
-    constraint = keychain.has_key(&authority.key()),
+        constraint = keychain.has_key(&authority.key()),
     )]
     pub keychain: Box<Account<'info, CurrentKeyChain>>,
 

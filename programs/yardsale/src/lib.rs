@@ -46,7 +46,7 @@ pub mod yardsale {
 
     // list an item
     pub fn list_item(ctx: Context<ListItem>, price: u64) -> Result<()> {
-        // make sure the item exists in the from account, since this might be an SFT, we check >= 1
+        // make sure the item exists in the from account - since this might be an SFT token account, we check for >= 1
         require!(ctx.accounts.authority_item_token.amount >= 1, YardsaleError::EmptyTokenAccount);
 
         // should we disallow a price of 0 ..?
@@ -164,7 +164,7 @@ pub mod yardsale {
     ) -> Result<()> {
 
         // make sure the item exists in the from account
-        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::EmptyTokenAccount);
+        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
 
         // first, transfer the item to the listing ata
         let rem_acc = &mut ctx.remaining_accounts.iter();
