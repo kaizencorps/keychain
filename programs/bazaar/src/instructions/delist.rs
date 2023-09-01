@@ -10,11 +10,8 @@ use anchor_lang::{prelude::*};
 use anchor_spl::associated_token::AssociatedToken;
 
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
-use spl_token::native_mint::ID as NATIVE_MINT;
-use crate::common::listing_domain::ListingDomain;
 use crate::common::seller::SellerAccount;
 
-use keychain::program::Keychain;
 use keychain::account::{CurrentDomain, CurrentKeyChain};
 use crate::common::util::transfer_items_out;
 

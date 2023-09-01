@@ -9,6 +9,7 @@ pub mod error;
 use instructions::{
     create_listing::*,
     create_listing_domain::*,
+    update_listing_domain::*,
     create_seller::*,
     delist::*,
     update_listing::*,
@@ -25,6 +26,13 @@ pub mod bazaar {
 
 
     pub fn create_listing_domain(
+        ctx: Context<CreateListingDomain>,
+        args: CreateListingDomainArgs,
+    ) -> Result<()> {
+        handle_create_listing_domain(ctx, args)
+    }
+
+    pub fn update_listing_domain(
         ctx: Context<CreateListingDomain>,
         args: CreateListingDomainArgs,
     ) -> Result<()> {
