@@ -163,8 +163,8 @@ pub mod yardsale {
         rules_acc_present: bool,
     ) -> Result<()> {
 
-        // make sure the item exists in the from account - pnfts won't be SFTs, so will always be 1, but we'll check >= 1
-        require!(ctx.accounts.authority_item_token.amount >= 1, YardsaleError::EmptyTokenAccount);
+        // make sure the item exists in the from account
+        require!(ctx.accounts.authority_item_token.amount == 1, YardsaleError::InvalidItem);
 
         // first, transfer the item to the listing ata
         let rem_acc = &mut ctx.remaining_accounts.iter();

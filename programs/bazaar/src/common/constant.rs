@@ -1,7 +1,7 @@
 
 pub const CURRENT_LISTING_VERSION: u8 = 0;
 pub const CURRENT_SELLER_VERSION: u8 = 0;
-pub const CURRENT_LISTING_DOMAIN_VERSION: u8 = 0;
+pub const CURRENT_LISTING_DOMAIN_VERSION: u8 = 1;
 pub const MAX_LISTING_ITEMS: usize = 3;
 
 // root seeds

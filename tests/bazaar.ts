@@ -35,9 +35,11 @@ const keyCost = new anchor.BN(anchor.web3.LAMPORTS_PER_SOL * 0.01);
 let txid: string;
 let tx: Transaction;
 let programDataAccount;
+let bazaarProgramAccount;
 
 // we'll use this as the keychain domain + listing domain treasury
 let treasury = anchor.web3.Keypair.generate();
+let feeVault = anchor.web3.Keypair.generate();
 
 const sellerName = randomName();
 let sellerKeychainPda = null;
@@ -45,6 +47,7 @@ let sellerKeypair = anchor.web3.Keypair.generate();
 let buyerKeypair = anchor.web3.Keypair.generate();
 let sellerAccountPda = null;
 let sellerAccountListingIndex = 0;
+let sellerFeeBasisPoints = 500;
 
 
 describe("bazaar", () => {
@@ -174,14 +177,18 @@ describe("bazaar", () => {
 
     // find the program's data account
     console.log('bazaar progid: ', bazaarProg.programId.toBase58());
-    const bazaarProgramAccount = await connection.getParsedAccountInfo(bazaarProg.programId);
+    bazaarProgramAccount = await connection.getParsedAccountInfo(bazaarProg.programId);
     // @ts-ignore
     programDataAccount = new PublicKey(bazaarProgramAccount.value.data.parsed.info.programData);
     console.log('program data account: ', programDataAccount);
 
+    // set w/data we'll overrite in the update
+    const badFeeVault = anchor.web3.Keypair.generate();
+    const badTreasury = anchor.web3.Keypair.generate();
+    const badBasisPoints = 1000;
 
     // now we can create the listing domain as an admin
-    txid = await bazaarProg.methods.createListingDomain({name: listingDomainName, domainIndex: 0, treasury: treasury.publicKey})
+    txid = await bazaarProg.methods.createListingDomain({name: listingDomainName, domainIndex: 0, treasury: badTreasury.publicKey, feeVault: badFeeVault.publicKey, sellerFeeBp:  badBasisPoints})
         .accounts({
           upgradeAuthority: bazaarProg.provider.wallet.publicKey,
           program: bazaarProg.programId,
@@ -191,7 +198,7 @@ describe("bazaar", () => {
         })
         .rpc();
 
-    // console.log(`created listing domain: ${listingDomainName}, pda: ${listingDomainPda}, txid `, txid);
+    console.log(`created listing domain: ${listingDomainName}, pda: ${listingDomainPda}, txid `, txid);
 
     let listingDomain = await bazaarProg.account.listingDomain.fetch(listingDomainPda);
     console.log('listing domain: ', listingDomain);
@@ -199,6 +206,31 @@ describe("bazaar", () => {
     const decodedName = new TextDecoder("utf-8").decode(new Uint8Array(listingDomain.name.filter(char => char !== 0)));
     console.log('decoded listing domain name: ', decodedName);
     assert.equal(decodedName, listingDomainName);
+
+  });
+
+  it("Updates a listing domain", async () => {
+
+    console.log('updating listing domain...');
+    // now update the listing domain as an admin
+    txid = await bazaarProg.methods.updateListingDomain(listingDomainName, 0, {treasury: treasury.publicKey, feeVault: feeVault.publicKey, sellerFeeBp: sellerFeeBasisPoints})
+        .accounts({
+          upgradeAuthority: bazaarProg.provider.wallet.publicKey,
+          program: bazaarProg.programId,
+          programData: programDataAccount,
+          listingDomain: listingDomainPda,
+        })
+        .rpc();
+
+    console.log(`updated listing domain: ${listingDomainName}, pda: ${listingDomainPda}, txid `, txid);
+
+    let listingDomain = await bazaarProg.account.listingDomain.fetch(listingDomainPda);
+    console.log('listing domain: ', listingDomain);
+
+    // check that our updates went through
+    assert.equal(treasury.publicKey.toBase58(), listingDomain.treasury.toBase58());
+    assert.equal(sellerFeeBasisPoints, listingDomain.sellerFeeBp);
+    assert.equal(feeVault.publicKey.toBase58(), listingDomain.feeVault.toBase58());
 
   });
 

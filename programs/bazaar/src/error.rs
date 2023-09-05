@@ -52,5 +52,9 @@ pub enum BazaarError {
     #[msg("Insufficient units")]
     InsufficientUnits,
 
+    // listing domain stuff
+    #[msg("Invalid basis points")]
+    InvalidBasisPoints,
+
 
 }
