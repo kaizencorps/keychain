@@ -8,27 +8,35 @@ use crate::{
 };
 
 use anchor_lang::{prelude::*, solana_program::program_option::COption};
+use crate::common::constant::CURRENT_LISTING_DOMAIN_VERSION;
 
 // admin function
 
 pub fn handle_update_listing_domain(
     ctx: Context<UpdateListingDomain>,
+    name: String,
+    domain_index: u8,
     args: UpdateListingDomainArgs,
 ) -> Result<()> {
 
     // check bp
-    require!(*args.seller_fee_bp <= 10_000, BazaarError::InvalidBasisPoints);
+    require!(args.seller_fee_bp <= 10_000, BazaarError::InvalidBasisPoints);
 
     let listing_domain = &mut ctx.accounts.listing_domain;
     listing_domain.fee_vault = args.fee_vault;
     listing_domain.seller_fee_bp = args.seller_fee_bp;
     listing_domain.treasury = args.treasury;
 
+    // set the account version
+    listing_domain.account_version = CURRENT_LISTING_DOMAIN_VERSION;
+
     Ok(())
 }
 
 #[derive(Accounts)]
 #[instruction(
+    name: String,
+    domain_index: u8,
     args: UpdateListingDomainArgs
 )]
 pub struct UpdateListingDomain<'info> {
@@ -46,7 +54,7 @@ pub struct UpdateListingDomain<'info> {
 
     #[account(
         mut,
-        seeds = [LISTING_DOMAIN.as_bytes().as_ref(), args.name.as_bytes().as_ref(), DOMAIN_INDEX.as_bytes().as_ref(), args.domain_index.to_le_bytes().as_ref()],
+        seeds = [LISTING_DOMAIN.as_bytes().as_ref(), name.as_ref(), DOMAIN_INDEX.as_bytes().as_ref(), domain_index.to_le_bytes().as_ref()],
         bump
     )]
     pub listing_domain: Box<Account<'info, ListingDomain>>,

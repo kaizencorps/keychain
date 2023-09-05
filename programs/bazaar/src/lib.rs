@@ -33,10 +33,12 @@ pub mod bazaar {
     }
 
     pub fn update_listing_domain(
-        ctx: Context<CreateListingDomain>,
-        args: CreateListingDomainArgs,
+        ctx: Context<UpdateListingDomain>,
+        name: String,
+        domain_index: u8,
+        args: UpdateListingDomainArgs,
     ) -> Result<()> {
-        handle_create_listing_domain(ctx, args)
+        handle_update_listing_domain(ctx, name, domain_index, args)
     }
 
     pub fn create_seller(

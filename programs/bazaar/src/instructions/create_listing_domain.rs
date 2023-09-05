@@ -27,6 +27,7 @@ pub fn handle_create_listing_domain(
     let domain_name_bytes = args.name.as_bytes();
     require!(domain_name_bytes.len() <= 32, BazaarError::NameTooLong);
 
+    require!(args.seller_fee_bp <= 10_000, BazaarError::InvalidBasisPoints);
 
     // copy the name in; fixed width
     let mut name = [0u8; 32];
@@ -40,6 +41,8 @@ pub fn handle_create_listing_domain(
     listing_domain.account_version = CURRENT_LISTING_DOMAIN_VERSION;
     listing_domain.domain_index = args.domain_index;
     listing_domain.treasury = args.treasury;
+    listing_domain.fee_vault = args.fee_vault;
+    listing_domain.seller_fee_bp = args.seller_fee_bp;
 
     Ok(())
 }
@@ -78,4 +81,6 @@ pub struct CreateListingDomainArgs {
     pub name: String,
     pub domain_index: u8,
     pub treasury: Pubkey,
+    pub fee_vault: Pubkey,
+    pub seller_fee_bp: u16
 }
