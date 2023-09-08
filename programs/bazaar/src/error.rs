@@ -52,5 +52,7 @@ pub enum BazaarError {
     #[msg("Insufficient units")]
     InsufficientUnits,
 
+    #[msg("The number of provided item quantities does not match the number of items in the listing")]
+    ItemQuantitiesMismatch,
 
 }

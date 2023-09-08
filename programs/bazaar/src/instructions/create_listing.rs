@@ -14,8 +14,7 @@ use spl_token::native_mint::ID as NATIVE_MINT;
 use crate::common::listing_domain::ListingDomain;
 use crate::common::seller::SellerAccount;
 
-use keychain::program::Keychain;
-use keychain::account::{CurrentDomain, CurrentKeyChain};
+use keychain::account::{CurrentKeyChain};
 
 
 pub fn handle_create_listing<'info>(
@@ -107,6 +106,8 @@ fn transfer_items_to_listing(accounts: &CreateListing<'_>, item_quantities: &[u6
             0 => &accounts.item_0_seller_token,
             1 => accounts.item_1_seller_token.as_ref().unwrap(),
             2 => accounts.item_2_seller_token.as_ref().unwrap(),
+            3 => accounts.item_3_seller_token.as_ref().unwrap(),
+            4 => accounts.item_4_seller_token.as_ref().unwrap(),
             _ => unreachable!(),
         };
 
@@ -114,6 +115,8 @@ fn transfer_items_to_listing(accounts: &CreateListing<'_>, item_quantities: &[u6
             0 => &accounts.item_0_listing_token,
             1 => accounts.item_1_listing_token.as_ref().unwrap(),
             2 => accounts.item_2_listing_token.as_ref().unwrap(),
+            3 => accounts.item_3_listing_token.as_ref().unwrap(),
+            4 => accounts.item_4_listing_token.as_ref().unwrap(),
             _ => unreachable!(),
         };
 
@@ -139,6 +142,8 @@ fn create_listing_items(accounts: &CreateListing<'_>, item_quantities: &[u64]) -
             0 => &accounts.item_0,
             1 => accounts.item_1.as_ref().unwrap(),
             2 => accounts.item_2.as_ref().unwrap(),
+            3 => accounts.item_3.as_ref().unwrap(),
+            4 => accounts.item_4.as_ref().unwrap(),
             _ => unreachable!(),
         };
 
@@ -146,6 +151,8 @@ fn create_listing_items(accounts: &CreateListing<'_>, item_quantities: &[u64]) -
             0 => &accounts.item_0_listing_token,
             1 => accounts.item_1_listing_token.as_ref().unwrap(),
             2 => accounts.item_2_listing_token.as_ref().unwrap(),
+            3 => accounts.item_3_listing_token.as_ref().unwrap(),
+            4 => accounts.item_4_listing_token.as_ref().unwrap(),
             _ => unreachable!(),
         };
 
@@ -164,16 +171,37 @@ fn check_item_quantities(accounts: &CreateListing<'_>, item_quantities: &[u64]) 
     require!(item_quantities.len() > 0, BazaarError::MissingItemQuantities);
     require!(item_quantities.iter().all(|&x| x > 0), BazaarError::InvalidItemQuantity);
 
+    // count the number of item types and make sure they match up with number if item_quantities
+    let mut num_item_types = 0;
+    for i in 0..5 {
+        let provided_item = match i {
+            0 => true,
+            1 => accounts.item_1_seller_token.is_some(),
+            2 => accounts.item_2_seller_token.is_some(),
+            3 => accounts.item_3_seller_token.is_some(),
+            4 => accounts.item_4_seller_token.is_some(),
+            _ => unreachable!(),
+        };
+
+        if provided_item {
+            num_item_types += 1;
+        }
+    }
+    require!(num_item_types == item_quantities.len(), BazaarError::ItemQuantitiesMismatch);
+
+    // make sure seller has enough of each item to sell
     for (i, quantity) in item_quantities.iter().enumerate() {
         let item_account = match i {
             0 => &accounts.item_0_seller_token,
             1 => accounts.item_1_seller_token.as_ref().unwrap(),
             2 => accounts.item_2_seller_token.as_ref().unwrap(),
+            3 => accounts.item_3_seller_token.as_ref().unwrap(),
+            4 => accounts.item_4_seller_token.as_ref().unwrap(),
             _ => unreachable!(),
         };
-
         require!(item_account.amount >= *quantity, BazaarError::NotEnoughItems);
     }
+
 
     Ok(())
 }
@@ -273,6 +301,40 @@ pub struct CreateListing<'info> {
         associated_token::authority = listing
     )]
     pub item_2_listing_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    pub item_3: Option<Box<Account<'info, Mint>>>,
+
+    #[account(
+        mut,
+        token::mint = item_3,
+        token::authority = seller
+    )]
+    pub item_3_seller_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    #[account(
+        init,
+        payer = seller,
+        associated_token::mint = item_3,
+        associated_token::authority = listing
+    )]
+    pub item_3_listing_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    pub item_4: Option<Box<Account<'info, Mint>>>,
+
+    #[account(
+        mut,
+        token::mint = item_4,
+        token::authority = seller
+    )]
+    pub item_4_seller_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    #[account(
+        init,
+        payer = seller,
+        associated_token::mint = item_4,
+        associated_token::authority = listing
+    )]
+    pub item_4_listing_token: Option<Box<Account<'info, TokenAccount>>>,
 
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
