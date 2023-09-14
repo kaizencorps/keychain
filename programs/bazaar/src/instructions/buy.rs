@@ -2,10 +2,8 @@ use crate::{
     error::BazaarError,
     common::{
         listing::{Listing, ListingType},
-        listing_domain::ListingDomain,
         seller::{SellerAccount}
     },
-    common::constant::{BAZAAR, CURRENT_LISTING_VERSION, SELLER},
 };
 
 use anchor_lang::{prelude::*, solana_program::program_option::COption};
@@ -16,7 +14,6 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer, CloseAccount}
 use spl_token::native_mint::ID as NATIVE_MINT;
 
 
-use crate::common::constant::{CURRENT_SELLER_VERSION, LISTING};
 use crate::common::util::transfer_items_out;
 
 
@@ -68,7 +65,15 @@ pub fn handle_buy(
                     require!(ctx.accounts.item_2_listing_token.is_some(), BazaarError::MissingListingItemToken);
                     ctx.accounts.item_2_listing_token.as_ref().unwrap().to_account_info()
                 },
-                _ => unreachable!("Only 3 items are supported"),
+                3 => {
+                    require!(ctx.accounts.item_3_listing_token.is_some(), BazaarError::MissingListingItemToken);
+                    ctx.accounts.item_3_listing_token.as_ref().unwrap().to_account_info()
+                },
+                4 => {
+                    require!(ctx.accounts.item_4_listing_token.is_some(), BazaarError::MissingListingItemToken);
+                    ctx.accounts.item_4_listing_token.as_ref().unwrap().to_account_info()
+                },
+                _ => unreachable!("Only 5 items are supported"),
             };
 
             let buyer_item_token_ai = match i {
@@ -81,7 +86,15 @@ pub fn handle_buy(
                     require!(ctx.accounts.item_2_buyer_token.is_some(), BazaarError::MissingBuyerItemToken);
                     ctx.accounts.item_2_buyer_token.as_ref().unwrap().to_account_info()
                 },
-                _ => unreachable!("Only 3 items are supported"),
+                3 => {
+                    require!(ctx.accounts.item_3_buyer_token.is_some(), BazaarError::MissingBuyerItemToken);
+                    ctx.accounts.item_3_buyer_token.as_ref().unwrap().to_account_info()
+                },
+                4 => {
+                    require!(ctx.accounts.item_4_buyer_token.is_some(), BazaarError::MissingBuyerItemToken);
+                    ctx.accounts.item_4_buyer_token.as_ref().unwrap().to_account_info()
+                },
+                _ => unreachable!("Only 5 items are supported"),
             };
 
             let treasury_ai = ctx.accounts.treasury.to_account_info();
@@ -299,6 +312,46 @@ pub struct Buy<'info> {
         constraint = listing.has_item_token(&item_2_listing_token.key())
     )]
     pub item_2_listing_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    #[account(
+        constraint = listing.has_item(&item_3.key())
+    )]
+    pub item_3: Option<Box<Account<'info, Mint>>>,
+
+    #[account(
+        mut,
+        associated_token::mint = item_3,
+        associated_token::authority = buyer,
+    )]
+    pub item_3_buyer_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    #[account(
+        mut,
+        associated_token::mint = item_3,
+        associated_token::authority = listing,
+        constraint = listing.has_item_token(&item_3_listing_token.key())
+    )]
+    pub item_3_listing_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    #[account(
+        constraint = listing.has_item(&item_4.key())
+    )]
+    pub item_4: Option<Box<Account<'info, Mint>>>,
+
+    #[account(
+        mut,
+        associated_token::mint = item_4,
+        associated_token::authority = buyer,
+    )]
+    pub item_4_buyer_token: Option<Box<Account<'info, TokenAccount>>>,
+
+    #[account(
+        mut,
+        associated_token::mint = item_4,
+        associated_token::authority = listing,
+        constraint = listing.has_item_token(&item_4_listing_token.key())
+    )]
+    pub item_4_listing_token: Option<Box<Account<'info, TokenAccount>>>,
 
     /// CHECK: just sending lamports here when closing listing accounts
     #[account(

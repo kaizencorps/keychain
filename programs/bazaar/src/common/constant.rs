@@ -1,7 +1,7 @@
 
-pub const CURRENT_LISTING_VERSION: u8 = 0;
+pub const CURRENT_LISTING_VERSION: u8 = 1;
 pub const CURRENT_SELLER_VERSION: u8 = 0;
-pub const CURRENT_LISTING_DOMAIN_VERSION: u8 = 1;
+pub const CURRENT_LISTING_DOMAIN_VERSION: u8 = 0;
 pub const MAX_LISTING_ITEMS: usize = 3;
 
 // root seeds
@@ -16,3 +16,7 @@ pub const KEYCHAIN: &str = "keychain";
 pub const KEYCHAIN_DOMAIN: &str = "keychain_domain";
 
 
+/*
+listing versions:
+1: max bundle size = 5
+ */

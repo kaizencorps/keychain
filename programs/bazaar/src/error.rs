@@ -56,5 +56,7 @@ pub enum BazaarError {
     #[msg("Invalid basis points")]
     InvalidBasisPoints,
 
+    #[msg("The number of provided item quantities does not match the number of items in the listing")]
+    ItemQuantitiesMismatch,
 
 }
