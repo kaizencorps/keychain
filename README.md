@@ -1,5 +1,13 @@
 # Overview
 
+This repository was initially created for the Keychain smart contract, but now houses 3 Solana-based smart contracts, which are used to power [Stache](https://stache.io)
+
+- Keychain: onchain wallet linking
+- Yardsale: NFT marketplace for gaming
+- Profile: onchain profile information
+
+## About Keychain
+
 Originally created at the Solana Hacker House in Bogota, Keychain is a way to link multiple wallets to a single on-chain account. 
 
 Keychain was created to solve [Domination's](https://domination.gg) delegated login problem: our players want to play
